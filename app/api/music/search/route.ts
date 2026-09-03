@@ -1,9 +1,9 @@
 import {
+  CATALOG_NOTE,
   corsHeaders,
   featuredTracks,
-  isJamendoConfigured,
   searchTracks,
-} from "@/lib/jamendo";
+} from "@/lib/music";
 
 export const runtime = "edge";
 
@@ -12,18 +12,6 @@ export function OPTIONS() {
 }
 
 export async function GET(request: Request) {
-  if (!isJamendoConfigured()) {
-    return Response.json(
-      {
-        configured: false,
-        tracks: [],
-        error: "Set JAMENDO_CLIENT_ID on the server (Jamendo Dev Portal).",
-        attribution: "Jamendo — Creative Commons. Attribution may be required.",
-      },
-      { status: 503, headers: corsHeaders() },
-    );
-  }
-
   const { searchParams } = new URL(request.url);
   const query = (searchParams.get("q") ?? searchParams.get("query") ?? "").trim();
   const limit = Math.min(
@@ -33,20 +21,23 @@ export async function GET(request: Request) {
   const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
 
   try {
-    const tracks = query
+    const { tracks, provider } = query
       ? await searchTracks(query, limit, offset)
       : await featuredTracks(limit);
 
     return Response.json(
       {
         configured: true,
+        provider,
         tracks,
-        attribution: "Jamendo — Creative Commons. Attribution may be required.",
+        attribution: CATALOG_NOTE,
       },
       {
         headers: {
           ...corsHeaders(),
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": query
+            ? "public, s-maxage=60, stale-while-revalidate=300"
+            : "public, s-maxage=15, stale-while-revalidate=60",
         },
       },
     );
@@ -55,6 +46,7 @@ export async function GET(request: Request) {
       {
         configured: true,
         tracks: [],
+        attribution: CATALOG_NOTE,
         error: error instanceof Error ? error.message : "music_search_failed",
       },
       { status: 502, headers: corsHeaders() },

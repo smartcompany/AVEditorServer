@@ -10,22 +10,25 @@ Next.js API for AVEditor Word Art / text template packs. Deploy on **Vercel**.
 | `GET /catalog.json` | Pack catalog (Flutter: `{baseUrl}/catalog.json`) |
 | `GET /text_packs/catalog.json` | Same catalog (alias) |
 | `GET /text_packs/lottie/*.json` | Lottie decorations |
-| `GET /api/music/search?q=` | Royalty-free music search (Jamendo proxy) |
+| `GET /api/music/search?q=` | Royalty-free music search (Pixabay / Mixkit) |
 | `GET /api/music/file?id=` | Download a track through the server |
 
-## Music catalog (Jamendo)
+## Music catalog (Pixabay / Mixkit)
 
-1. Create a free client id at https://devportal.jamendo.com  
-2. In the Vercel project → **Settings → Environment Variables**, add:
+Tracks are **free for commercial use** and **do not require attribution**.
+
+1. (Optional) Get a free API key at https://pixabay.com/api/docs/ and set:
 
 ```text
-JAMENDO_CLIENT_ID=your_client_id
+PIXABAY_API_KEY=your_key
 ```
 
-3. Redeploy the server
+2. Redeploy the server
 
-Flutter calls `{baseUrl}/api/music/search` by default (same host as text packs).  
-Alternatively, build the app with `--dart-define=JAMENDO_CLIENT_ID=...` to talk to Jamendo directly.
+When `PIXABAY_API_KEY` is set, search prefers Pixabay Music (`/api/audio/`).  
+Otherwise the server uses **Mixkit** (same license profile) — no key required.
+
+Flutter calls `{baseUrl}/api/music/search` by default (same host as text packs).
 
 ## Local dev
 

@@ -1,8 +1,8 @@
 import {
   corsHeaders,
-  isJamendoConfigured,
-  jamendoDownloadUrl,
-} from "@/lib/jamendo";
+  mixkitDownloadUrl,
+  pixabayDownloadUrl,
+} from "@/lib/music";
 
 export const runtime = "edge";
 
@@ -10,15 +10,8 @@ export function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
-/** Proxies a Jamendo track download so the Flutter client never embeds the API key. */
+/** Proxies a catalog MP3 so the Flutter client never embeds API keys. */
 export async function GET(request: Request) {
-  if (!isJamendoConfigured()) {
-    return Response.json(
-      { error: "jamendo_not_configured" },
-      { status: 503, headers: corsHeaders() },
-    );
-  }
-
   const id = new URL(request.url).searchParams.get("id")?.trim();
   if (!id) {
     return Response.json(
@@ -28,10 +21,21 @@ export async function GET(request: Request) {
   }
 
   try {
-    const upstream = await fetch(jamendoDownloadUrl(id));
+    const upstreamUrl =
+      mixkitDownloadUrl(id) ?? (await pixabayDownloadUrl(id));
+    if (!upstreamUrl) {
+      return Response.json(
+        { error: "unknown_track" },
+        { status: 404, headers: corsHeaders() },
+      );
+    }
+
+    const upstream = await fetch(upstreamUrl, {
+      headers: { Accept: "audio/mpeg,audio/*,*/*" },
+    });
     if (!upstream.ok) {
       return Response.json(
-        { error: `jamendo_download_failed:${upstream.status}` },
+        { error: `music_download_failed:${upstream.status}` },
         { status: 502, headers: corsHeaders() },
       );
     }
