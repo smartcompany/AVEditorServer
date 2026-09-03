@@ -80,7 +80,7 @@ export default function HomePage() {
             lineHeight: 1.5,
           }}
         >{`await TextTemplatePackService.instance.setRemoteBaseUrl(
-  'https://YOUR_PROJECT.vercel.app/',
+  'https://aveditorserver.vercel.app/',
 );`}</pre>
       </section>
     </main>

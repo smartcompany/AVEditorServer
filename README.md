@@ -39,13 +39,13 @@ In the Vercel dashboard, set the project **Root Directory** to `server` if the r
 After deploy, in the app **Settings → Text template server** set:
 
 ```text
-https://YOUR_PROJECT.vercel.app/
+https://aveditorserver.vercel.app/
 ```
 
-Or launch with:
+The Flutter client already defaults to this production URL. Override with:
 
 ```bash
-flutter run --dart-define=TEXT_PACK_BASE_URL=https://YOUR_PROJECT.vercel.app/
+flutter run --dart-define=TEXT_PACK_BASE_URL=https://other.vercel.app/
 ```
 
 ## Adding packs
