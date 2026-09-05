@@ -1,4 +1,8 @@
-import { autocompleteSuggestions, corsHeaders } from "@/lib/music";
+import {
+  autocompleteSuggestions,
+  corsHeaders,
+  type CatalogKind,
+} from "@/lib/music";
 
 export const runtime = "edge";
 
@@ -6,16 +10,20 @@ export function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
+function parseKind(raw: string | null): CatalogKind {
+  return raw?.trim().toLowerCase() === "sfx" ? "sfx" : "music";
+}
+
 export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
   const prefix =
-    new URL(request.url).searchParams.get("q") ??
-    new URL(request.url).searchParams.get("prefix") ??
-    "";
+    params.get("q") ?? params.get("prefix") ?? "";
+  const kind = parseKind(params.get("kind"));
 
   try {
-    const suggestions = await autocompleteSuggestions(prefix, 10);
+    const suggestions = await autocompleteSuggestions(prefix, 10, kind);
     return Response.json(
-      { configured: true, suggestions },
+      { configured: true, kind, suggestions },
       {
         headers: {
           ...corsHeaders(),
@@ -27,6 +35,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         configured: true,
+        kind,
         suggestions: [],
         error: error instanceof Error ? error.message : "autocomplete_failed",
       },
