@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
         source: "/api/text-packs/catalog.json",
         destination: "/api/text-packs/catalog",
       },
+      {
+        source: "/transitions/catalog.json",
+        destination: "/api/transitions/catalog",
+      },
+      {
+        source: "/api/transitions/catalog.json",
+        destination: "/api/transitions/catalog",
+      },
     ];
   },
   async headers() {
