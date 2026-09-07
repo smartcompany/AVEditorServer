@@ -8,6 +8,7 @@ export function GET() {
       catalog: "/text_packs/catalog.json",
       lottie: "/text_packs/lottie/{name}.json",
       transitions: "/transitions/catalog.json",
+      transitionsList: "/api/transitions",
       health: "/api/health",
     },
   });

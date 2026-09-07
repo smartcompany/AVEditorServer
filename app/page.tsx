@@ -5,7 +5,8 @@ const endpoints = [
   { path: "/text_packs/lottie/hearts.json", desc: "Sample Lottie: Hearts" },
   { path: "/text_packs/lottie/burst.json", desc: "Sample Lottie: BAM" },
   { path: "/text_packs/lottie/glow_spark.json", desc: "Sample Lottie: Spark" },
-  { path: "/transitions/catalog.json", desc: "Cut-transition catalog (xfade + metadata)" },
+  { path: "/transitions/catalog.json", desc: "Cut-transition catalog (definitions + categories)" },
+  { path: "/api/transitions", desc: "Flat transition list (?category=motion)" },
 ];
 
 export default function HomePage() {
