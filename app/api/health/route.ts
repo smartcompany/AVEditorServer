@@ -7,6 +7,7 @@ export function GET() {
     endpoints: {
       catalog: "/text_packs/catalog.json",
       lottie: "/text_packs/lottie/{name}.json",
+      transitions: "/transitions/catalog.json",
       health: "/api/health",
     },
   });
