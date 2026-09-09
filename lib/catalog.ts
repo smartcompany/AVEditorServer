@@ -49,6 +49,11 @@ export type TextStyleTemplate = {
   preferredFontId?: string;
 };
 
+export type TextEntranceAnimation = {
+  id: "typewriter" | "fade" | "slide_up";
+  durationMs?: number;
+};
+
 export type TextTemplatePackItem = {
   id: string;
   title: string;
@@ -58,6 +63,8 @@ export type TextTemplatePackItem = {
   previewUrl?: string;
   downloadSizeBytes?: number;
   style: TextStyleTemplate;
+  /** Entrance motion; omit for static text. */
+  animation?: TextEntranceAnimation;
 };
 
 export type TextTemplatePackCategory = {
@@ -88,6 +95,7 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
         title: "Journal",
         premium: false,
         downloadSizeBytes: 0,
+        animation: { id: "typewriter", durationMs: 900 },
         style: {
           id: "pack_journal",
           label: "Journal",
@@ -112,6 +120,7 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
         title: "Neon",
         premium: false,
         downloadSizeBytes: 0,
+        animation: { id: "fade", durationMs: 800 },
         style: {
           id: "pack_neon_pulse",
           label: "Neon",
@@ -143,6 +152,7 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
         title: "Sticker",
         premium: false,
         downloadSizeBytes: 0,
+        animation: { id: "slide_up", durationMs: 700 },
         style: {
           id: "pack_sticker",
           label: "Sticker",
@@ -169,7 +179,7 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return {
-    version: 3,
+    version: 4,
     baseUrl: normalized,
     categories: PACK_CATEGORIES,
   };
