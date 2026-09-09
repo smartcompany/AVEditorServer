@@ -67,8 +67,12 @@ flutter run --dart-define=TEXT_PACK_BASE_URL=https://other.vercel.app/
 
 ## Adding packs
 
-1. Drop Lottie JSON into `public/text_packs/lottie/`
-2. Register the item in `lib/catalog.ts` (`PACK_CATEGORIES`) with `lottieUrl: "text_packs/lottie/your.json"`
-3. Redeploy
+Templates are **server-driven**. Edit the catalog and redeploy the server — **no Flutter app release** is required, as long as the style uses paint features the client already supports (strokes, glow, shadow, line backgrounds including `shape: "brush"`, `preferredFontId`).
+
+1. (Optional) Drop Lottie JSON into `public/text_packs/lottie/`
+2. Register the item in `lib/catalog.ts` (`PACK_CATEGORIES`) with a full `style` object
+3. Redeploy the server (`npx vercel --prod`)
 
 Keep `style` filled in for every pack — Flutter uses it for preview + export paint parity.
+
+Offline fallback: the Flutter app ships a copy under `client/assets/text_packs/catalog.json`. Remote catalog **wins on merge**, so production updates still apply without an app store release.
