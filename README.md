@@ -67,7 +67,11 @@ flutter run --dart-define=TEXT_PACK_BASE_URL=https://other.vercel.app/
 
 ## Adding packs
 
-Templates are **server-driven**. Edit the catalog and redeploy the server — **no Flutter app release** is required, as long as the style uses paint features the client already supports (strokes, glow, shadow, line backgrounds including `shape: "brush"`, `preferredFontId`).
+**Text effects** (static CapCut-style looks) live in `lib/catalog.ts` under `kind: "effect"` — no `animation` field.
+
+**Text templates** (effect + entrance motion) can add `kind: "template"` and `animation: { id, durationMs }` later.
+
+Edit the catalog and redeploy the server — **no Flutter app release** is required as long as styles use paint features the client already supports (strokes, glow, shadow, brush line backgrounds, `fillGradient`, `preferredFontId`).
 
 1. (Optional) Drop Lottie JSON into `public/text_packs/lottie/`
 2. Register the item in `lib/catalog.ts` (`PACK_CATEGORIES`) with a full `style` object
