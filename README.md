@@ -69,7 +69,7 @@ flutter run --dart-define=TEXT_PACK_BASE_URL=https://other.vercel.app/
 
 **Text effects** (static CapCut-style looks) live in `lib/catalog.ts` under `kind: "effect"` — no `animation` field.
 
-**Text templates** (effect + entrance motion) can add `kind: "template"` and `animation: { id, durationMs }` later.
+**Text templates** (effect + entrance motion) use `kind: "template"` and `animation: { id, durationMs }` (e.g. Journal / Neon / Sticker).
 
 Edit the catalog and redeploy the server — **no Flutter app release** is required as long as styles use paint features the client already supports (strokes, glow, shadow, brush line backgrounds, `fillGradient`, `preferredFontId`).
 

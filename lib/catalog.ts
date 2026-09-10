@@ -63,7 +63,7 @@ export type TextEntranceAnimation = {
 /**
  * Pack kinds:
  * - effect: static CapCut-style text look (no motion)
- * - template: effect + entrance animation (future)
+ * - template: effect + entrance animation
  */
 export type TextTemplatePackKind = "effect" | "template";
 
@@ -95,8 +95,9 @@ export type TextTemplatePackCatalog = {
 };
 
 /**
- * Static text effects served to the Flutter client (CapCut "text effects").
- * No animation — motion belongs on text templates later.
+ * Effects + templates served to the Flutter client.
+ * - effects: static CapCut-style looks
+ * - templates: look + entrance animation (Journal / Neon / Sticker)
  */
 export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
   {
@@ -179,12 +180,103 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
       },
     ],
   },
+  {
+    id: "templates",
+    title: "Templates",
+    items: [
+      {
+        id: "pack_journal",
+        title: "Journal",
+        kind: "template",
+        premium: false,
+        downloadSizeBytes: 0,
+        animation: { id: "typewriter", durationMs: 900 },
+        style: {
+          id: "pack_journal",
+          label: "Journal",
+          fillColor: 4280948752, // 0xFF2A1810
+          fillUseAccent: false,
+          preferredFontId: "gaegu",
+          lineBackground: {
+            useAccent: false,
+            color: 4294108364, // 0xFFF2E4CC
+            opacity: 1,
+            padHFactor: 0.42,
+            padVFactor: 0.32,
+            radiusFactor: 0.35,
+            shape: "brush",
+            shadowOpacity: 0.55,
+            shadowBlurFactor: 0.28,
+          },
+        },
+      },
+      {
+        id: "pack_neon_pulse",
+        title: "Neon",
+        kind: "template",
+        premium: false,
+        downloadSizeBytes: 0,
+        animation: { id: "fade", durationMs: 800 },
+        style: {
+          id: "pack_neon_pulse",
+          label: "Neon",
+          fillColor: 4294967295, // 0xFFFFFFFF
+          fillUseAccent: false,
+          preferredFontId: "blackHanSans",
+          strokes: [
+            { widthFactor: 0.18, useAccent: true },
+            { widthFactor: 0.08, useAccent: false, color: 4294967295 },
+          ],
+          glow: {
+            blurFactor: 0.7,
+            widthFactor: 0.28,
+            useAccent: true,
+            opacity: 0.95,
+          },
+          shadow: {
+            dxFactor: 0,
+            dyFactor: 0.02,
+            blurFactor: 0.18,
+            useAccent: false,
+            color: 4278190080,
+            opacity: 0.5,
+          },
+        },
+      },
+      {
+        id: "pack_sticker",
+        title: "Sticker",
+        kind: "template",
+        premium: false,
+        downloadSizeBytes: 0,
+        animation: { id: "slide_up", durationMs: 700 },
+        style: {
+          id: "pack_sticker",
+          label: "Sticker",
+          fillUseAccent: true,
+          preferredFontId: "blackHanSans",
+          strokes: [
+            { widthFactor: 0.26, useAccent: false, color: 4294967295 },
+            { widthFactor: 0.12, useAccent: false, color: 4279308561 }, // 0xFF111111
+          ],
+          shadow: {
+            dxFactor: 0.07,
+            dyFactor: 0.09,
+            blurFactor: 0,
+            useAccent: false,
+            color: 4278190080,
+            opacity: 0.85,
+          },
+        },
+      },
+    ],
+  },
 ];
 
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return {
-    version: 5,
+    version: 6,
     baseUrl: normalized,
     categories: PACK_CATEGORIES,
   };
