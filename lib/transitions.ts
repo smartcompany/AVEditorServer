@@ -24,6 +24,14 @@ export type TransitionLayerDto = {
   easing?: string;
   target?: "outgoing" | "incoming" | "both";
   bezier?: number[];
+  /** Normalized progress window [0,1]. Defaults to full span. */
+  start?: number;
+  end?: number;
+  /**
+   * When set, endpoints are scaled toward the property identity by
+   * `parameters[param]` (e.g. intensity). Authors write values at param=1.
+   */
+  param?: string;
 };
 
 export type TransitionParameterDto = {
@@ -138,6 +146,91 @@ const intensityParam: Record<string, TransitionParameterDto> = {
   intensity: { type: "double", default: 0.7, min: 0, max: 1 },
 };
 
+/** CapCut-style cursor zoom — authored at intensity=1; client scales via param. */
+const cursorZoomLayers: TransitionLayerDto[] = [
+  {
+    property: "scale",
+    from: 1,
+    to: 1.8,
+    easing: "easeInOut",
+    target: "outgoing",
+    start: 0,
+    end: 0.5,
+    param: "intensity",
+  },
+  {
+    property: "scale",
+    from: 1.8,
+    to: 1.8,
+    target: "outgoing",
+    start: 0.5,
+    end: 1,
+    param: "intensity",
+  },
+  {
+    property: "opacity",
+    from: 1,
+    to: 0,
+    easing: "easeInOut",
+    target: "outgoing",
+    start: 0.42,
+    end: 0.58,
+  },
+  {
+    property: "scale",
+    from: 1.8,
+    to: 1.8,
+    target: "incoming",
+    start: 0,
+    end: 0.5,
+    param: "intensity",
+  },
+  {
+    property: "scale",
+    from: 1.8,
+    to: 1,
+    easing: "easeInOut",
+    target: "incoming",
+    start: 0.5,
+    end: 1,
+    param: "intensity",
+  },
+  {
+    property: "opacity",
+    from: 0,
+    to: 1,
+    easing: "easeInOut",
+    target: "incoming",
+    start: 0.42,
+    end: 0.58,
+  },
+];
+
+const flashLayers: TransitionLayerDto[] = [
+  { property: "opacity", from: 1, to: 0, target: "outgoing" },
+  { property: "opacity", from: 0, to: 1, target: "incoming" },
+  {
+    property: "brightness",
+    from: 0,
+    to: 1,
+    easing: "easeOut",
+    target: "both",
+    start: 0,
+    end: 0.5,
+    param: "intensity",
+  },
+  {
+    property: "brightness",
+    from: 1,
+    to: 0,
+    easing: "easeIn",
+    target: "both",
+    start: 0.5,
+    end: 1,
+    param: "intensity",
+  },
+];
+
 const BASIC: TransitionItemDto[] = [
   {
     id: "none",
@@ -191,15 +284,7 @@ const BASIC: TransitionItemDto[] = [
     maxDurationMs: 800,
     parameters: intensityParam,
     controls: [intensityControl],
-    layers: [
-      {
-        property: "brightness",
-        from: 0,
-        to: 1,
-        easing: "easeOut",
-        target: "both",
-      },
-    ],
+    layers: flashLayers,
     renderer: "primitive",
   }),
 ];
@@ -237,19 +322,15 @@ const MOTION: TransitionItemDto[] = [
 ];
 
 const ZOOM: TransitionItemDto[] = [
-  xfade("zoomin", "Zoom In", "#F472B6", "zoomin", {
+  xfade("zoomin", "커서 확대/축소", "#F472B6", "zoomin", {
     category: "zoom",
+    renderer: "primitive",
+    defaultDurationMs: 4000,
+    minDurationMs: 500,
+    maxDurationMs: 8000,
     parameters: intensityParam,
     controls: [intensityControl],
-    layers: [
-      {
-        property: "scale",
-        from: 1,
-        to: 1.35,
-        easing: "easeInOut",
-        target: "incoming",
-      },
-    ],
+    layers: cursorZoomLayers,
   }),
   xfade("zoomout", "Zoom Out", "#FB7185", "squeezev", {
     category: "zoom",
@@ -335,11 +416,23 @@ const WIPE: TransitionItemDto[] = [
 
 const TRENDING: TransitionItemDto[] = [
   xfade("fade", "Fade", "#60A5FA", "fade", { category: "trending" }),
-  xfade("zoomin", "Zoom In", "#F472B6", "zoomin", { category: "trending" }),
+  xfade("zoomin", "커서 확대/축소", "#F472B6", "zoomin", {
+    category: "trending",
+    renderer: "primitive",
+    defaultDurationMs: 4000,
+    minDurationMs: 500,
+    maxDurationMs: 8000,
+    parameters: intensityParam,
+    controls: [intensityControl],
+    layers: cursorZoomLayers,
+  }),
   xfade("flash", "Flash", "#FDE68A", "fadewhite", {
     category: "trending",
     defaultDurationMs: 250,
     renderer: "primitive",
+    parameters: intensityParam,
+    controls: [intensityControl],
+    layers: flashLayers,
   }),
   xfade("pushleft", "Push Left", "#34D399", "coverleft", {
     category: "trending",
@@ -365,7 +458,7 @@ function uniqueItems(groups: TransitionItemDto[][]): TransitionItemDto[] {
 
 /** CapCut-like phase-1 catalog; clients merge with offline fallbacks. */
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 3,
+  version: 6,
   baseUrl: "",
   categories: [
     { id: "trending", title: "Trending", items: TRENDING },
