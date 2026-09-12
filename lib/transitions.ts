@@ -322,12 +322,12 @@ const MOTION: TransitionItemDto[] = [
 ];
 
 const ZOOM: TransitionItemDto[] = [
-  xfade("zoomin", "커서 확대/축소", "#F472B6", "zoomin", {
+  xfade("zoomin", "Cursor Zoom", "#F472B6", "zoomin", {
     category: "zoom",
     renderer: "primitive",
-    defaultDurationMs: 4000,
-    minDurationMs: 500,
-    maxDurationMs: 8000,
+    defaultDurationMs: 2000,
+    minDurationMs: 100,
+    maxDurationMs: 3300,
     parameters: intensityParam,
     controls: [intensityControl],
     layers: cursorZoomLayers,
@@ -416,12 +416,12 @@ const WIPE: TransitionItemDto[] = [
 
 const TRENDING: TransitionItemDto[] = [
   xfade("fade", "Fade", "#60A5FA", "fade", { category: "trending" }),
-  xfade("zoomin", "커서 확대/축소", "#F472B6", "zoomin", {
+  xfade("zoomin", "Cursor Zoom", "#F472B6", "zoomin", {
     category: "trending",
     renderer: "primitive",
-    defaultDurationMs: 4000,
-    minDurationMs: 500,
-    maxDurationMs: 8000,
+    defaultDurationMs: 2000,
+    minDurationMs: 100,
+    maxDurationMs: 3300,
     parameters: intensityParam,
     controls: [intensityControl],
     layers: cursorZoomLayers,
