@@ -335,21 +335,6 @@ function pushLayers(
 // —— Catalog aligned to docs/transitions-spec.md ——
 
 const BASIC: TransitionItemDto[] = [
-  {
-    id: "none",
-    version: 1,
-    itemVersion: 1,
-    title: "None",
-    name: "None",
-    category: "basic",
-    renderer: "cut",
-    effectType: "cut",
-    ffmpegName: "",
-    defaultDurationMs: 0,
-    minDurationMs: 0,
-    maxDurationMs: 0,
-    accent: "#6B7280",
-  },
   xfade("fade", "Fade", "#60A5FA", "fade", {
     category: "basic",
     layers: opacityCross,
@@ -1035,7 +1020,7 @@ function uniqueItems(groups: TransitionItemDto[][]): TransitionItemDto[] {
 
 /** Catalog aligned to docs/transitions-spec.md */
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 7,
+  version: 8,
   baseUrl: "",
   categories: [
     { id: "trending", title: "Trending", items: TRENDING },
