@@ -290,6 +290,7 @@ function slideLayers(
   axis: "translateX" | "translateY",
   dir: 1 | -1,
 ): TransitionLayerDto[] {
+  // Solid conveyor slide — both clips stay opaque (no crossfade ghosting).
   return [
     {
       property: axis,
@@ -305,7 +306,18 @@ function slideLayers(
       easing: "easeInOut",
       target: "incoming",
     },
-    ...opacityCross.map((l) => ({ ...l, easing: "linear" as const })),
+    {
+      property: "opacity",
+      from: 1,
+      to: 1,
+      target: "outgoing",
+    },
+    {
+      property: "opacity",
+      from: 1,
+      to: 1,
+      target: "incoming",
+    },
   ];
 }
 
@@ -313,7 +325,7 @@ function pushLayers(
   axis: "translateX" | "translateY",
   dir: 1 | -1,
 ): TransitionLayerDto[] {
-  // Incoming covers outgoing (push).
+  // Incoming covers outgoing (push). Keep both fully opaque.
   return [
     {
       property: axis,
@@ -327,6 +339,18 @@ function pushLayers(
       from: dir,
       to: 0,
       easing: "easeInOut",
+      target: "incoming",
+    },
+    {
+      property: "opacity",
+      from: 1,
+      to: 1,
+      target: "outgoing",
+    },
+    {
+      property: "opacity",
+      from: 1,
+      to: 1,
       target: "incoming",
     },
   ];
