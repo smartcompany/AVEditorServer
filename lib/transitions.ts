@@ -78,6 +78,12 @@ export type TransitionItemDto = {
   assetUrl?: string;
   shader?: string;
   customId?: string;
+  /**
+   * Server-driven effect DSL consumed by the client Transition Engine.
+   * Example (ripple):
+   * `{ type: "distortion", shape: "radial", source: "wave", wave: {...}, center: [0.5,0.5] }`
+   */
+  effect?: Record<string, unknown>;
   downloadSizeBytes?: number;
   itemVersion?: number;
   layers?: TransitionLayerDto[];
@@ -112,6 +118,8 @@ type XfadeOpts = {
   renderer?: TransitionRenderer;
   /** Client special-case compositor id (e.g. doorway). */
   customId?: string;
+  /** Server-driven effect DSL (distortion / wave / …). */
+  effect?: Record<string, unknown>;
   version?: number;
 };
 
@@ -149,6 +157,7 @@ function xfade(
     parameters: opts.parameters,
     controls: opts.controls,
     customId: opts.customId,
+    effect: opts.effect,
   };
 }
 
@@ -273,18 +282,6 @@ const TITLES = {
     ko: "오른쪽으로 퍼즐 효과",
     ja: "パズル右",
     zh: "向右拼图",
-  },
-  pagecurlleft: {
-    en: "Page Curl Left",
-    ko: "페이지 좌측으로 말기",
-    ja: "ページカール左",
-    zh: "向左翻页",
-  },
-  pagecurlright: {
-    en: "Page Curl Right",
-    ko: "페이지 우측으로 말기",
-    ja: "ページカール右",
-    zh: "向右翻页",
   },
   crosszoom: {
     en: "Cross Zoom",
@@ -768,19 +765,6 @@ const BASIC: TransitionItemDto[] = [
     customId: "puzzleright",
     layers: [],
   }),
-  xfade("pagecurlleft", TITLES.pagecurlleft, "#F9A8D4", "diagtl", {
-    category: "basic",
-    renderer: "primitive",
-    customId: "pagecurlleft",
-    // Preview: page peel from bottom-right toward top-left.
-    layers: [],
-  }),
-  xfade("pagecurlright", TITLES.pagecurlright, "#F472B6", "diagtr", {
-    category: "basic",
-    renderer: "primitive",
-    customId: "pagecurlright",
-    layers: [],
-  }),
   xfade("crosszoom", TITLES.crosszoom, "#22D3EE", "fade", {
     category: "basic",
     renderer: "primitive",
@@ -838,61 +822,29 @@ const BASIC: TransitionItemDto[] = [
   xfade("ripple", TITLES.ripple, "#06B6D4", "hblur", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "blur",
-        from: 0,
-        to: 10,
-        target: "outgoing",
-        end: 0.5,
-        param: "intensity",
+    customId: "radialWave",
+    version: 2,
+    // Preview uses the radialWave engine (concentric waves from center).
+    // Params are server-owned; client does not hardcode ripple look.
+    layers: [],
+    effect: {
+      type: "distortion",
+      shape: "radial",
+      source: "wave",
+      wave: {
+        frequency: 28,
+        amplitude: 0.045,
+        width: 0.14,
       },
-      {
-        property: "scale",
-        from: 1,
-        to: 1.08,
-        target: "outgoing",
-        end: 0.5,
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "outgoing",
-        start: 0.3,
-        end: 0.65,
-      },
-      {
-        property: "blur",
-        from: 10,
-        to: 0,
-        target: "incoming",
-        start: 0.45,
-        param: "intensity",
-      },
-      {
-        property: "scale",
-        from: 1.08,
-        to: 1,
-        target: "incoming",
-        start: 0.45,
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        target: "incoming",
-        start: 0.3,
-        end: 0.65,
-      },
-    ],
+      center: [0.5, 0.5],
+    },
     parameters: intensityParam,
     controls: [intensityControl],
   }),
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 21,
+  version: 23,
   baseUrl: "",
   categories: [
     {
