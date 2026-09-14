@@ -110,6 +110,8 @@ type XfadeOpts = {
   controls?: TransitionControlDto[];
   /** When set, renderer becomes primitive but still exports via ffmpegName. */
   renderer?: TransitionRenderer;
+  /** Client special-case compositor id (e.g. doorway). */
+  customId?: string;
   version?: number;
 };
 
@@ -143,6 +145,7 @@ function xfade(
     layers: opts.layers,
     parameters: opts.parameters,
     controls: opts.controls,
+    customId: opts.customId,
   };
 }
 
@@ -471,29 +474,29 @@ const BASIC: TransitionItemDto[] = [
   xfade("fadeblack", TITLES.fadeblack, "#1F2937", "fadeblack", {
     category: "basic",
     renderer: "primitive",
+    // Classic dip: keep a continuous A↔B crossfade while brightness dips to
+    // black at the midpoint, then recovers. Sequential opacity windows left a
+    // fully transparent gap at t=0.5.
     layers: [
       {
         property: "opacity",
         from: 1,
         to: 0,
-        easing: "easeIn",
+        easing: "easeInOut",
         target: "outgoing",
-        start: 0,
-        end: 0.5,
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
-        easing: "easeOut",
+        easing: "easeInOut",
         target: "incoming",
-        start: 0.5,
-        end: 1,
       },
       {
         property: "brightness",
         from: 0,
         to: -1,
+        easing: "easeInOut",
         target: "both",
         start: 0,
         end: 0.5,
@@ -502,6 +505,7 @@ const BASIC: TransitionItemDto[] = [
         property: "brightness",
         from: -1,
         to: 0,
+        easing: "easeInOut",
         target: "both",
         start: 0.5,
         end: 1,
@@ -516,24 +520,21 @@ const BASIC: TransitionItemDto[] = [
         property: "opacity",
         from: 1,
         to: 0,
-        easing: "easeIn",
+        easing: "easeInOut",
         target: "outgoing",
-        start: 0,
-        end: 0.5,
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
-        easing: "easeOut",
+        easing: "easeInOut",
         target: "incoming",
-        start: 0.5,
-        end: 1,
       },
       {
         property: "brightness",
         from: 0,
         to: 1,
+        easing: "easeInOut",
         target: "both",
         start: 0,
         end: 0.5,
@@ -542,6 +543,7 @@ const BASIC: TransitionItemDto[] = [
         property: "brightness",
         from: 1,
         to: 0,
+        easing: "easeInOut",
         target: "both",
         start: 0.5,
         end: 1,
@@ -551,10 +553,11 @@ const BASIC: TransitionItemDto[] = [
   xfade("spinin", TITLES.spinin, "#65A30D", "circleopen", {
     category: "basic",
     renderer: "primitive",
+    // A stays as a solid backdrop; B spins/scales in on top.
     layers: [
       {
         property: "rotation",
-        from: -0.35,
+        from: -0.12,
         to: 0,
         easing: "easeOut",
         target: "incoming",
@@ -566,33 +569,17 @@ const BASIC: TransitionItemDto[] = [
         easing: "easeOut",
         target: "incoming",
       },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        start: 0,
-        end: 0.55,
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "outgoing",
-        start: 0.35,
-        end: 0.75,
-      },
     ],
   }),
   xfade("spinout", TITLES.spinout, "#4D7C0F", "circleclose", {
     category: "basic",
     renderer: "primitive",
+    // B is already the full backdrop; A spins/scales away on top.
     layers: [
       {
         property: "rotation",
         from: 0,
-        to: 0.35,
+        to: 0.12,
         easing: "easeIn",
         target: "outgoing",
       },
@@ -602,23 +589,6 @@ const BASIC: TransitionItemDto[] = [
         to: 0.4,
         easing: "easeIn",
         target: "outgoing",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0.25,
-        end: 0.7,
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        target: "incoming",
-        start: 0.3,
-        end: 0.8,
       },
     ],
   }),
@@ -633,126 +603,25 @@ const BASIC: TransitionItemDto[] = [
   xfade("doorway", TITLES.doorway, "#84CC16", "horzopen", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "scale",
-        from: 1,
-        to: 1.35,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0.35,
-        end: 0.75,
-      },
-      {
-        property: "scale",
-        from: 0.85,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        start: 0.25,
-        end: 0.7,
-      },
-    ],
+    customId: "doorway",
+    // Preview uses a dedicated doorway compositor (A splits L/R, B comes through).
+    layers: [],
   }),
   xfade("swap", TITLES.swap, "#A3E635", "slideleft", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "translateX",
-        from: 0,
-        to: -1,
-        easing: "easeInOut",
-        target: "outgoing",
-      },
-      {
-        property: "translateX",
-        from: 1,
-        to: 0,
-        easing: "easeInOut",
-        target: "incoming",
-      },
-      {
-        property: "scale",
-        from: 1,
-        to: 0.92,
-        target: "outgoing",
-        start: 0,
-        end: 0.5,
-      },
-      {
-        property: "scale",
-        from: 0.92,
-        to: 1,
-        target: "incoming",
-        start: 0.5,
-        end: 1,
-      },
-      ...opacityCross,
-    ],
+    customId: "swap",
+    defaultDurationMs: 800,
+    // Preview uses a dedicated 3D swap compositor (reflective stage).
+    layers: [],
   }),
   xfade("cube", TITLES.cube, "#38BDF8", "slideleft", {
     category: "basic",
     renderer: "primitive",
+    customId: "cube",
     defaultDurationMs: 700,
-    layers: [
-      {
-        property: "translateX",
-        from: 0,
-        to: -1,
-        easing: "easeInOut",
-        target: "outgoing",
-      },
-      {
-        property: "scale",
-        from: 1,
-        to: 0.85,
-        easing: "easeInOut",
-        target: "outgoing",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0.6,
-        target: "outgoing",
-        end: 0.55,
-      },
-      {
-        property: "translateX",
-        from: 1,
-        to: 0,
-        easing: "easeInOut",
-        target: "incoming",
-      },
-      {
-        property: "scale",
-        from: 0.85,
-        to: 1,
-        easing: "easeInOut",
-        target: "incoming",
-      },
-      {
-        property: "opacity",
-        from: 0.6,
-        to: 1,
-        target: "incoming",
-        start: 0.45,
-      },
-    ],
+    // Preview uses a dedicated 3D cube compositor.
+    layers: [],
   }),
   xfade("mosaic", TITLES.mosaic, "#F97316", "pixelize", {
     category: "basic",
@@ -1075,7 +944,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 11,
+  version: 16,
   baseUrl: "",
   categories: [
     {
