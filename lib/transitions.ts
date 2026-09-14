@@ -115,6 +115,9 @@ type XfadeOpts = {
   version?: number;
 };
 
+/** Catalog source of truth — clients must read `defaultDurationMs` from items. */
+export const DEFAULT_TRANSITION_DURATION_MS = 700;
+
 function xfade(
   id: string,
   titles: LocalizedTitles,
@@ -136,7 +139,7 @@ function xfade(
     renderer,
     effectType: renderer === "cut" ? "cut" : "xfade",
     ffmpegName,
-    defaultDurationMs: opts.defaultDurationMs ?? 500,
+    defaultDurationMs: opts.defaultDurationMs ?? DEFAULT_TRANSITION_DURATION_MS,
     minDurationMs: opts.minDurationMs ?? 100,
     maxDurationMs: opts.maxDurationMs ?? 3000,
     accent,
@@ -594,11 +597,9 @@ const BASIC: TransitionItemDto[] = [
   }),
   xfade("circleopen", TITLES.circleopen, "#F472B6", "circleopen", {
     category: "basic",
-    defaultDurationMs: 600,
   }),
   xfade("circleclose", TITLES.circleclose, "#EC4899", "circleclose", {
     category: "basic",
-    defaultDurationMs: 600,
   }),
   xfade("doorway", TITLES.doorway, "#84CC16", "horzopen", {
     category: "basic",
@@ -610,18 +611,87 @@ const BASIC: TransitionItemDto[] = [
   xfade("swap", TITLES.swap, "#A3E635", "slideleft", {
     category: "basic",
     renderer: "primitive",
-    customId: "swap",
-    defaultDurationMs: 800,
-    // Preview uses a dedicated 3D swap compositor (reflective stage).
-    layers: [],
+    layers: [
+      {
+        property: "translateX",
+        from: 0,
+        to: -1,
+        easing: "easeInOut",
+        target: "outgoing",
+      },
+      {
+        property: "translateX",
+        from: 1,
+        to: 0,
+        easing: "easeInOut",
+        target: "incoming",
+      },
+      {
+        property: "scale",
+        from: 1,
+        to: 0.92,
+        target: "outgoing",
+        start: 0,
+        end: 0.5,
+      },
+      {
+        property: "scale",
+        from: 0.92,
+        to: 1,
+        target: "incoming",
+        start: 0.5,
+        end: 1,
+      },
+      ...opacityCross,
+    ],
   }),
   xfade("cube", TITLES.cube, "#38BDF8", "slideleft", {
     category: "basic",
     renderer: "primitive",
-    customId: "cube",
-    defaultDurationMs: 700,
-    // Preview uses a dedicated 3D cube compositor.
-    layers: [],
+    layers: [
+      {
+        property: "translateX",
+        from: 0,
+        to: -1,
+        easing: "easeInOut",
+        target: "outgoing",
+      },
+      {
+        property: "scale",
+        from: 1,
+        to: 0.85,
+        easing: "easeInOut",
+        target: "outgoing",
+      },
+      {
+        property: "opacity",
+        from: 1,
+        to: 0.6,
+        target: "outgoing",
+        end: 0.55,
+      },
+      {
+        property: "translateX",
+        from: 1,
+        to: 0,
+        easing: "easeInOut",
+        target: "incoming",
+      },
+      {
+        property: "scale",
+        from: 0.85,
+        to: 1,
+        easing: "easeInOut",
+        target: "incoming",
+      },
+      {
+        property: "opacity",
+        from: 0.6,
+        to: 1,
+        target: "incoming",
+        start: 0.45,
+      },
+    ],
   }),
   xfade("mosaic", TITLES.mosaic, "#F97316", "pixelize", {
     category: "basic",
@@ -688,150 +758,28 @@ const BASIC: TransitionItemDto[] = [
   xfade("puzzleleft", TITLES.puzzleleft, "#FB923C", "wipeleft", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "translateX",
-        from: 0,
-        to: -0.15,
-        target: "outgoing",
-        end: 0.6,
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "outgoing",
-        start: 0.2,
-        end: 0.7,
-      },
-      {
-        property: "translateX",
-        from: 0.35,
-        to: 0,
-        easing: "easeOut",
-        target: "incoming",
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        start: 0.15,
-        end: 0.65,
-      },
-    ],
+    customId: "puzzleleft",
+    // Preview: B split into 3 vertical strips that slide in sequentially.
+    layers: [],
   }),
   xfade("puzzleright", TITLES.puzzleright, "#F97316", "wiperight", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "translateX",
-        from: 0,
-        to: 0.15,
-        target: "outgoing",
-        end: 0.6,
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "outgoing",
-        start: 0.2,
-        end: 0.7,
-      },
-      {
-        property: "translateX",
-        from: -0.35,
-        to: 0,
-        easing: "easeOut",
-        target: "incoming",
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        start: 0.15,
-        end: 0.65,
-      },
-    ],
+    customId: "puzzleright",
+    layers: [],
   }),
   xfade("pagecurlleft", TITLES.pagecurlleft, "#F9A8D4", "diagtl", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "translateX",
-        from: 0,
-        to: -0.25,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "rotation",
-        from: 0,
-        to: -0.12,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0.35,
-        end: 0.85,
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        target: "incoming",
-        start: 0.2,
-        end: 0.6,
-      },
-    ],
+    customId: "pagecurlleft",
+    // Preview: page peel from bottom-right toward top-left.
+    layers: [],
   }),
   xfade("pagecurlright", TITLES.pagecurlright, "#F472B6", "diagtr", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      {
-        property: "translateX",
-        from: 0,
-        to: 0.25,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "rotation",
-        from: 0,
-        to: 0.12,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0.35,
-        end: 0.85,
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        target: "incoming",
-        start: 0.2,
-        end: 0.6,
-      },
-    ],
+    customId: "pagecurlright",
+    layers: [],
   }),
   xfade("crosszoom", TITLES.crosszoom, "#22D3EE", "fade", {
     category: "basic",
@@ -944,7 +892,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 16,
+  version: 21,
   baseUrl: "",
   categories: [
     {
