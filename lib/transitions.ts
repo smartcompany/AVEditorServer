@@ -50,11 +50,19 @@ export type TransitionControlDto = {
   default?: number;
 };
 
+/** App language codes; clients pick `titles[locale]` with `en` fallback. */
+export type TransitionLocale = "en" | "ko" | "ja" | "zh";
+
+export type LocalizedTitles = Record<TransitionLocale, string>;
+
 export type TransitionItemDto = {
   id: string;
   version: number;
+  /** Default display title (English). Prefer [titles] for localization. */
   title: string;
   name?: string;
+  /** Server-owned localized labels. */
+  titles: LocalizedTitles;
   category: string;
   renderer: TransitionRenderer;
   /** Legacy mirror for older clients. */
@@ -80,6 +88,7 @@ export type TransitionItemDto = {
 export type TransitionCategoryDto = {
   id: string;
   title: string;
+  titles: LocalizedTitles;
   items: TransitionItemDto[];
 };
 
@@ -106,19 +115,21 @@ type XfadeOpts = {
 
 function xfade(
   id: string,
-  title: string,
+  titles: LocalizedTitles,
   accent: string,
   ffmpegName: string,
   opts: XfadeOpts = {},
 ): TransitionItemDto {
   const renderer = opts.renderer ?? "xfade";
   const version = opts.version ?? 1;
+  const title = titles.en;
   return {
     id,
     version,
     itemVersion: version,
     title,
     name: title,
+    titles,
     category: opts.category ?? "basic",
     renderer,
     effectType: renderer === "cut" ? "cut" : "xfade",
@@ -134,6 +145,161 @@ function xfade(
     controls: opts.controls,
   };
 }
+
+/** iMovie-style display names — source of truth for all locales. */
+const TITLES = {
+  dissolve: {
+    en: "Cross Dissolve",
+    ko: "교차 디졸브",
+    ja: "クロスディゾルブ",
+    zh: "交叉溶解",
+  },
+  crossblur: {
+    en: "Cross Blur",
+    ko: "교차 흐림",
+    ja: "クロスブラー",
+    zh: "交叉模糊",
+  },
+  fadeblack: {
+    en: "Fade to Black",
+    ko: "검정색으로 페이드",
+    ja: "ブラックにフェード",
+    zh: "淡出到黑色",
+  },
+  fadewhite: {
+    en: "Fade to White",
+    ko: "흰색으로 페이드",
+    ja: "ホワイトにフェード",
+    zh: "淡出到白色",
+  },
+  spinin: {
+    en: "Spin In",
+    ko: "안으로 회전",
+    ja: "スピンイン",
+    zh: "旋入",
+  },
+  spinout: {
+    en: "Spin Out",
+    ko: "밖으로 회전",
+    ja: "スピンアウト",
+    zh: "旋出",
+  },
+  circleopen: {
+    en: "Circle Open",
+    ko: "열리는 원",
+    ja: "サークルオープン",
+    zh: "圆形打开",
+  },
+  circleclose: {
+    en: "Circle Close",
+    ko: "닫히는 원",
+    ja: "サークルクローズ",
+    zh: "圆形关闭",
+  },
+  doorway: {
+    en: "Doorway",
+    ko: "출입문",
+    ja: "ドアウェイ",
+    zh: "门",
+  },
+  swap: {
+    en: "Swap",
+    ko: "바꾸기",
+    ja: "スワップ",
+    zh: "交换",
+  },
+  cube: {
+    en: "Cube",
+    ko: "큐브",
+    ja: "キューブ",
+    zh: "立方体",
+  },
+  mosaic: {
+    en: "Mosaic",
+    ko: "모자이크",
+    ja: "モザイク",
+    zh: "马赛克",
+  },
+  wipeleft: {
+    en: "Wipe Left",
+    ko: "왼쪽으로 닦아내기",
+    ja: "ワイプ左",
+    zh: "向左擦除",
+  },
+  wiperight: {
+    en: "Wipe Right",
+    ko: "오른쪽으로 닦아내기",
+    ja: "ワイプ右",
+    zh: "向右擦除",
+  },
+  wipeup: {
+    en: "Wipe Up",
+    ko: "위로 닦아내기",
+    ja: "ワイプ上",
+    zh: "向上擦除",
+  },
+  wipedown: {
+    en: "Wipe Down",
+    ko: "아래로 닦아내기",
+    ja: "ワイプ下",
+    zh: "向下擦除",
+  },
+  slideleft: {
+    en: "Slide Left",
+    ko: "왼쪽으로 슬라이드",
+    ja: "スライド左",
+    zh: "向左滑动",
+  },
+  slideright: {
+    en: "Slide Right",
+    ko: "오른쪽으로 슬라이드",
+    ja: "スライド右",
+    zh: "向右滑动",
+  },
+  puzzleleft: {
+    en: "Puzzle Left",
+    ko: "왼쪽으로 퍼즐 효과",
+    ja: "パズル左",
+    zh: "向左拼图",
+  },
+  puzzleright: {
+    en: "Puzzle Right",
+    ko: "오른쪽으로 퍼즐 효과",
+    ja: "パズル右",
+    zh: "向右拼图",
+  },
+  pagecurlleft: {
+    en: "Page Curl Left",
+    ko: "페이지 좌측으로 말기",
+    ja: "ページカール左",
+    zh: "向左翻页",
+  },
+  pagecurlright: {
+    en: "Page Curl Right",
+    ko: "페이지 우측으로 말기",
+    ja: "ページカール右",
+    zh: "向右翻页",
+  },
+  crosszoom: {
+    en: "Cross Zoom",
+    ko: "교차 확대/축소",
+    ja: "クロスズーム",
+    zh: "交叉缩放",
+  },
+  ripple: {
+    en: "Ripple",
+    ko: "잔물결",
+    ja: "リップル",
+    zh: "波纹",
+  },
+} as const satisfies Record<string, LocalizedTitles>;
+
+const CATEGORY_BASIC_TITLES: LocalizedTitles = {
+  en: "Basic",
+  ko: "기본형",
+  ja: "基本",
+  zh: "基本",
+};
 
 const intensityControl: TransitionControlDto = {
   type: "slider",
@@ -162,127 +328,6 @@ const opacityCross: TransitionLayerDto[] = [
     to: 1,
     easing: "easeInOut",
     target: "incoming",
-  },
-];
-
-/**
- * Cursor Zoom (docs/transitions-spec.md):
- * click → center zooms in → zooms out while the next clip appears.
- */
-const cursorZoomLayers: TransitionLayerDto[] = [
-  // Hold briefly (click beat), then zoom in on A.
-  {
-    property: "scale",
-    from: 1,
-    to: 1,
-    target: "outgoing",
-    start: 0,
-    end: 0.08,
-  },
-  {
-    property: "scale",
-    from: 1,
-    to: 2.1,
-    easing: "easeIn",
-    target: "outgoing",
-    start: 0.08,
-    end: 0.42,
-    param: "intensity",
-  },
-  {
-    property: "opacity",
-    from: 1,
-    to: 1,
-    target: "outgoing",
-    start: 0,
-    end: 0.42,
-  },
-  {
-    property: "opacity",
-    from: 0,
-    to: 0,
-    target: "incoming",
-    start: 0,
-    end: 0.42,
-  },
-  // Peak hand-off: B appears at full zoom, then both settle as B zooms out.
-  {
-    property: "opacity",
-    from: 1,
-    to: 0,
-    easing: "easeOut",
-    target: "outgoing",
-    start: 0.42,
-    end: 0.55,
-  },
-  {
-    property: "opacity",
-    from: 0,
-    to: 1,
-    easing: "easeIn",
-    target: "incoming",
-    start: 0.42,
-    end: 0.55,
-  },
-  {
-    property: "scale",
-    from: 2.1,
-    to: 2.1,
-    target: "outgoing",
-    start: 0.42,
-    end: 0.55,
-    param: "intensity",
-  },
-  {
-    property: "scale",
-    from: 2.1,
-    to: 2.1,
-    target: "incoming",
-    start: 0.42,
-    end: 0.55,
-    param: "intensity",
-  },
-  {
-    property: "scale",
-    from: 2.1,
-    to: 1,
-    easing: "easeOut",
-    target: "incoming",
-    start: 0.55,
-    end: 1,
-    param: "intensity",
-  },
-  {
-    property: "opacity",
-    from: 1,
-    to: 1,
-    target: "incoming",
-    start: 0.55,
-    end: 1,
-  },
-];
-
-const flashLayers: TransitionLayerDto[] = [
-  ...opacityCross,
-  {
-    property: "brightness",
-    from: 0,
-    to: 1,
-    easing: "easeOut",
-    target: "both",
-    start: 0,
-    end: 0.5,
-    param: "intensity",
-  },
-  {
-    property: "brightness",
-    from: 1,
-    to: 0,
-    easing: "easeIn",
-    target: "both",
-    start: 0.5,
-    end: 1,
-    param: "intensity",
   },
 ];
 
@@ -356,14 +401,11 @@ function pushLayers(
   ];
 }
 
-// —— Catalog aligned to docs/transitions-spec.md ——
+
+// —— iMovie-style basic transitions (단일 탭: 기본형) ——
 
 const BASIC: TransitionItemDto[] = [
-  xfade("fade", "Fade", "#60A5FA", "fade", {
-    category: "basic",
-    layers: opacityCross,
-  }),
-  xfade("dissolve", "Cross Dissolve", "#A78BFA", "dissolve", {
+  xfade("dissolve", TITLES.dissolve, "#A78BFA", "dissolve", {
     category: "basic",
     layers: [
       {
@@ -382,7 +424,51 @@ const BASIC: TransitionItemDto[] = [
       },
     ],
   }),
-  xfade("fadeblack", "Dip To Black", "#1F2937", "fadeblack", {
+  xfade("crossblur", TITLES.crossblur, "#818CF8", "dissolve", {
+    category: "basic",
+    renderer: "primitive",
+    layers: [
+      {
+        property: "blur",
+        from: 0,
+        to: 12,
+        easing: "easeIn",
+        target: "outgoing",
+        end: 0.55,
+        param: "intensity",
+      },
+      {
+        property: "opacity",
+        from: 1,
+        to: 0,
+        easing: "easeIn",
+        target: "outgoing",
+        start: 0.25,
+        end: 0.7,
+      },
+      {
+        property: "blur",
+        from: 12,
+        to: 0,
+        easing: "easeOut",
+        target: "incoming",
+        start: 0.35,
+        param: "intensity",
+      },
+      {
+        property: "opacity",
+        from: 0,
+        to: 1,
+        easing: "easeOut",
+        target: "incoming",
+        start: 0.3,
+        end: 0.75,
+      },
+    ],
+    parameters: intensityParam,
+    controls: [intensityControl],
+  }),
+  xfade("fadeblack", TITLES.fadeblack, "#1F2937", "fadeblack", {
     category: "basic",
     renderer: "primitive",
     layers: [
@@ -422,7 +508,7 @@ const BASIC: TransitionItemDto[] = [
       },
     ],
   }),
-  xfade("fadewhite", "Dip To White", "#E5E7EB", "fadewhite", {
+  xfade("fadewhite", TITLES.fadewhite, "#E5E7EB", "fadewhite", {
     category: "basic",
     renderer: "primitive",
     layers: [
@@ -462,88 +548,90 @@ const BASIC: TransitionItemDto[] = [
       },
     ],
   }),
-];
-
-const MOTION: TransitionItemDto[] = [
-  xfade("slideleft", "Slide Left", "#FBBF24", "slideleft", {
-    category: "motion",
-    renderer: "primitive",
-    layers: slideLayers("translateX", 1),
-  }),
-  xfade("slideright", "Slide Right", "#F59E0B", "slideright", {
-    category: "motion",
-    renderer: "primitive",
-    layers: slideLayers("translateX", -1),
-  }),
-  xfade("slideup", "Slide Up", "#FCD34D", "slideup", {
-    category: "motion",
-    renderer: "primitive",
-    layers: slideLayers("translateY", 1),
-  }),
-  xfade("slidedown", "Slide Down", "#D97706", "slidedown", {
-    category: "motion",
-    renderer: "primitive",
-    layers: slideLayers("translateY", -1),
-  }),
-  xfade("pushleft", "Push Left", "#34D399", "coverleft", {
-    category: "motion",
-    renderer: "primitive",
-    layers: pushLayers("translateX", 1),
-  }),
-  xfade("pushright", "Push Right", "#10B981", "coverright", {
-    category: "motion",
-    renderer: "primitive",
-    layers: pushLayers("translateX", -1),
-  }),
-  xfade("pushup", "Push Up", "#6EE7B7", "coverup", {
-    category: "motion",
-    renderer: "primitive",
-    layers: pushLayers("translateY", 1),
-  }),
-  xfade("pushdown", "Push Down", "#059669", "coverdown", {
-    category: "motion",
-    renderer: "primitive",
-    layers: pushLayers("translateY", -1),
-  }),
-  xfade("swap", "Swap", "#A3E635", "slideleft", {
-    category: "motion",
+  xfade("spinin", TITLES.spinin, "#65A30D", "circleopen", {
+    category: "basic",
     renderer: "primitive",
     layers: [
       {
-        property: "translateX",
-        from: 0,
-        to: -1,
-        easing: "easeInOut",
-        target: "outgoing",
+        property: "rotation",
+        from: -0.35,
+        to: 0,
+        easing: "easeOut",
+        target: "incoming",
       },
       {
-        property: "translateX",
+        property: "scale",
+        from: 0.4,
+        to: 1,
+        easing: "easeOut",
+        target: "incoming",
+      },
+      {
+        property: "opacity",
+        from: 0,
+        to: 1,
+        easing: "easeOut",
+        target: "incoming",
+        start: 0,
+        end: 0.55,
+      },
+      {
+        property: "opacity",
         from: 1,
         to: 0,
-        easing: "easeInOut",
-        target: "incoming",
+        target: "outgoing",
+        start: 0.35,
+        end: 0.75,
+      },
+    ],
+  }),
+  xfade("spinout", TITLES.spinout, "#4D7C0F", "circleclose", {
+    category: "basic",
+    renderer: "primitive",
+    layers: [
+      {
+        property: "rotation",
+        from: 0,
+        to: 0.35,
+        easing: "easeIn",
+        target: "outgoing",
       },
       {
         property: "scale",
         from: 1,
-        to: 0.92,
+        to: 0.4,
+        easing: "easeIn",
         target: "outgoing",
-        start: 0,
-        end: 0.5,
       },
       {
-        property: "scale",
-        from: 0.92,
+        property: "opacity",
+        from: 1,
+        to: 0,
+        easing: "easeIn",
+        target: "outgoing",
+        start: 0.25,
+        end: 0.7,
+      },
+      {
+        property: "opacity",
+        from: 0,
         to: 1,
         target: "incoming",
-        start: 0.5,
-        end: 1,
+        start: 0.3,
+        end: 0.8,
       },
-      ...opacityCross,
     ],
   }),
-  xfade("doorway", "Doorway", "#84CC16", "horzopen", {
-    category: "motion",
+  xfade("circleopen", TITLES.circleopen, "#F472B6", "circleopen", {
+    category: "basic",
+    defaultDurationMs: 600,
+  }),
+  xfade("circleclose", TITLES.circleclose, "#EC4899", "circleclose", {
+    category: "basic",
+    defaultDurationMs: 600,
+  }),
+  xfade("doorway", TITLES.doorway, "#84CC16", "horzopen", {
+    category: "basic",
     renderer: "primitive",
     layers: [
       {
@@ -580,175 +668,179 @@ const MOTION: TransitionItemDto[] = [
       },
     ],
   }),
-  xfade("spinin", "Spin In", "#65A30D", "circleopen", {
-    category: "motion",
-    renderer: "primitive",
-    layers: [
-      {
-        property: "rotation",
-        from: -0.35,
-        to: 0,
-        easing: "easeOut",
-        target: "incoming",
-      },
-      {
-        property: "scale",
-        from: 0.4,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        start: 0,
-        end: 0.55,
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "outgoing",
-        start: 0.35,
-        end: 0.75,
-      },
-    ],
-  }),
-  xfade("spinout", "Spin Out", "#4D7C0F", "circleclose", {
-    category: "motion",
-    renderer: "primitive",
-    layers: [
-      {
-        property: "rotation",
-        from: 0,
-        to: 0.35,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "scale",
-        from: 1,
-        to: 0.4,
-        easing: "easeIn",
-        target: "outgoing",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0.25,
-        end: 0.7,
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        target: "incoming",
-        start: 0.3,
-        end: 0.8,
-      },
-    ],
-  }),
-];
-
-const WIPE: TransitionItemDto[] = [
-  xfade("wipeleft", "Wipe Left", "#34D399", "wipeleft", { category: "wipe" }),
-  xfade("wiperight", "Wipe Right", "#2DD4BF", "wiperight", {
-    category: "wipe",
-  }),
-  xfade("wipeup", "Wipe Up", "#5EEAD4", "wipeup", { category: "wipe" }),
-  xfade("wipedown", "Wipe Down", "#14B8A6", "wipedown", { category: "wipe" }),
-  xfade("circleopen", "Circle Open", "#F472B6", "circleopen", {
-    category: "wipe",
-    defaultDurationMs: 600,
-  }),
-  xfade("circleclose", "Circle Close", "#EC4899", "circleclose", {
-    category: "wipe",
-    defaultDurationMs: 600,
-  }),
-  xfade("radial", "Radial Wipe", "#FB7185", "radial", { category: "wipe" }),
-  xfade("pagecurl", "Page Curl", "#F9A8D4", "diagtr", {
-    category: "wipe",
+  xfade("swap", TITLES.swap, "#A3E635", "slideleft", {
+    category: "basic",
     renderer: "primitive",
     layers: [
       {
         property: "translateX",
         from: 0,
-        to: 0.35,
-        easing: "easeIn",
+        to: -1,
+        easing: "easeInOut",
         target: "outgoing",
       },
       {
-        property: "translateY",
+        property: "translateX",
+        from: 1,
+        to: 0,
+        easing: "easeInOut",
+        target: "incoming",
+      },
+      {
+        property: "scale",
+        from: 1,
+        to: 0.92,
+        target: "outgoing",
+        start: 0,
+        end: 0.5,
+      },
+      {
+        property: "scale",
+        from: 0.92,
+        to: 1,
+        target: "incoming",
+        start: 0.5,
+        end: 1,
+      },
+      ...opacityCross,
+    ],
+  }),
+  xfade("cube", TITLES.cube, "#38BDF8", "slideleft", {
+    category: "basic",
+    renderer: "primitive",
+    defaultDurationMs: 700,
+    layers: [
+      {
+        property: "translateX",
         from: 0,
-        to: -0.2,
-        easing: "easeIn",
+        to: -1,
+        easing: "easeInOut",
         target: "outgoing",
       },
       {
-        property: "rotation",
-        from: 0,
-        to: -0.08,
+        property: "scale",
+        from: 1,
+        to: 0.85,
+        easing: "easeInOut",
         target: "outgoing",
       },
       {
         property: "opacity",
         from: 1,
-        to: 0,
-        easing: "easeIn",
+        to: 0.6,
         target: "outgoing",
-        start: 0.35,
-        end: 0.9,
+        end: 0.55,
+      },
+      {
+        property: "translateX",
+        from: 1,
+        to: 0,
+        easing: "easeInOut",
+        target: "incoming",
+      },
+      {
+        property: "scale",
+        from: 0.85,
+        to: 1,
+        easing: "easeInOut",
+        target: "incoming",
       },
       {
         property: "opacity",
-        from: 0,
+        from: 0.6,
         to: 1,
         target: "incoming",
-        start: 0.2,
-        end: 0.65,
+        start: 0.45,
       },
     ],
   }),
-];
-
-const ZOOM: TransitionItemDto[] = [
-  xfade("zoomin", "Zoom In", "#F472B6", "zoomin", {
-    category: "zoom",
+  xfade("mosaic", TITLES.mosaic, "#F97316", "pixelize", {
+    category: "basic",
     renderer: "primitive",
-    version: 4,
-    parameters: intensityParam,
-    controls: [intensityControl],
     layers: [
       {
-        property: "scale",
-        from: 1,
-        to: 1.45,
-        easing: "easeIn",
+        property: "blur",
+        from: 0,
+        to: 8,
         target: "outgoing",
+        end: 0.5,
         param: "intensity",
       },
       {
         property: "opacity",
         from: 1,
         to: 0,
-        easing: "easeIn",
         target: "outgoing",
         start: 0.35,
-        end: 0.85,
+        end: 0.65,
       },
       {
-        property: "scale",
-        from: 1.45,
+        property: "blur",
+        from: 8,
+        to: 0,
+        target: "incoming",
+        start: 0.5,
+        param: "intensity",
+      },
+      {
+        property: "opacity",
+        from: 0,
         to: 1,
+        target: "incoming",
+        start: 0.35,
+        end: 0.65,
+      },
+    ],
+    parameters: intensityParam,
+    controls: [intensityControl],
+  }),
+  xfade("wipeleft", TITLES.wipeleft, "#34D399", "wipeleft", {
+    category: "basic",
+  }),
+  xfade("wiperight", TITLES.wiperight, "#2DD4BF", "wiperight", {
+    category: "basic",
+  }),
+  xfade("wipeup", TITLES.wipeup, "#5EEAD4", "wipeup", {
+    category: "basic",
+  }),
+  xfade("wipedown", TITLES.wipedown, "#14B8A6", "wipedown", {
+    category: "basic",
+  }),
+  xfade("slideleft", TITLES.slideleft, "#FBBF24", "slideleft", {
+    category: "basic",
+    renderer: "primitive",
+    layers: slideLayers("translateX", 1),
+  }),
+  xfade("slideright", TITLES.slideright, "#F59E0B", "slideright", {
+    category: "basic",
+    renderer: "primitive",
+    layers: slideLayers("translateX", -1),
+  }),
+  xfade("puzzleleft", TITLES.puzzleleft, "#FB923C", "wipeleft", {
+    category: "basic",
+    renderer: "primitive",
+    layers: [
+      {
+        property: "translateX",
+        from: 0,
+        to: -0.15,
+        target: "outgoing",
+        end: 0.6,
+      },
+      {
+        property: "opacity",
+        from: 1,
+        to: 0,
+        target: "outgoing",
+        start: 0.2,
+        end: 0.7,
+      },
+      {
+        property: "translateX",
+        from: 0.35,
+        to: 0,
         easing: "easeOut",
         target: "incoming",
-        param: "intensity",
       },
       {
         property: "opacity",
@@ -761,20 +853,60 @@ const ZOOM: TransitionItemDto[] = [
       },
     ],
   }),
-  xfade("zoomout", "Zoom Out", "#FB7185", "squeezev", {
-    category: "zoom",
+  xfade("puzzleright", TITLES.puzzleright, "#F97316", "wiperight", {
+    category: "basic",
     renderer: "primitive",
-    version: 2,
-    parameters: intensityParam,
-    controls: [intensityControl],
     layers: [
       {
-        property: "scale",
+        property: "translateX",
+        from: 0,
+        to: 0.15,
+        target: "outgoing",
+        end: 0.6,
+      },
+      {
+        property: "opacity",
         from: 1,
-        to: 0.65,
+        to: 0,
+        target: "outgoing",
+        start: 0.2,
+        end: 0.7,
+      },
+      {
+        property: "translateX",
+        from: -0.35,
+        to: 0,
+        easing: "easeOut",
+        target: "incoming",
+      },
+      {
+        property: "opacity",
+        from: 0,
+        to: 1,
+        easing: "easeOut",
+        target: "incoming",
+        start: 0.15,
+        end: 0.65,
+      },
+    ],
+  }),
+  xfade("pagecurlleft", TITLES.pagecurlleft, "#F9A8D4", "diagtl", {
+    category: "basic",
+    renderer: "primitive",
+    layers: [
+      {
+        property: "translateX",
+        from: 0,
+        to: -0.25,
         easing: "easeIn",
         target: "outgoing",
-        param: "intensity",
+      },
+      {
+        property: "rotation",
+        from: 0,
+        to: -0.12,
+        easing: "easeIn",
+        target: "outgoing",
       },
       {
         property: "opacity",
@@ -782,16 +914,8 @@ const ZOOM: TransitionItemDto[] = [
         to: 0,
         easing: "easeIn",
         target: "outgoing",
-        start: 0.3,
-        end: 0.8,
-      },
-      {
-        property: "scale",
-        from: 0.65,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        param: "intensity",
+        start: 0.35,
+        end: 0.85,
       },
       {
         property: "opacity",
@@ -799,151 +923,65 @@ const ZOOM: TransitionItemDto[] = [
         to: 1,
         target: "incoming",
         start: 0.2,
-        end: 0.7,
+        end: 0.6,
       },
     ],
   }),
-  xfade("crosszoom", "Cross Zoom", "#E879F9", "zoomin", {
-    category: "zoom",
+  xfade("pagecurlright", TITLES.pagecurlright, "#F472B6", "diagtr", {
+    category: "basic",
     renderer: "primitive",
-    version: 2,
-    parameters: intensityParam,
-    controls: [intensityControl],
+    layers: [
+      {
+        property: "translateX",
+        from: 0,
+        to: 0.25,
+        easing: "easeIn",
+        target: "outgoing",
+      },
+      {
+        property: "rotation",
+        from: 0,
+        to: 0.12,
+        easing: "easeIn",
+        target: "outgoing",
+      },
+      {
+        property: "opacity",
+        from: 1,
+        to: 0,
+        easing: "easeIn",
+        target: "outgoing",
+        start: 0.35,
+        end: 0.85,
+      },
+      {
+        property: "opacity",
+        from: 0,
+        to: 1,
+        target: "incoming",
+        start: 0.2,
+        end: 0.6,
+      },
+    ],
+  }),
+  xfade("crosszoom", TITLES.crosszoom, "#22D3EE", "fade", {
+    category: "basic",
+    renderer: "primitive",
     layers: [
       {
         property: "scale",
         from: 1,
-        to: 1.3,
+        to: 1.6,
         easing: "easeIn",
         target: "outgoing",
         param: "intensity",
       },
       {
-        property: "scale",
-        from: 1.3,
-        to: 1,
-        easing: "easeOut",
-        target: "incoming",
-        param: "intensity",
-      },
-      ...opacityCross,
-    ],
-  }),
-  xfade("cursorzoom", "Cursor Zoom", "#DB2777", "zoomin", {
-    category: "zoom",
-    renderer: "primitive",
-    version: 1,
-    defaultDurationMs: 2000,
-    minDurationMs: 100,
-    maxDurationMs: 3300,
-    parameters: intensityParam,
-    controls: [intensityControl],
-    layers: cursorZoomLayers,
-  }),
-  xfade("zoomblur", "Zoom Blur", "#C084FC", "hblur", {
-    category: "zoom",
-    renderer: "primitive",
-    version: 2,
-    parameters: intensityParam,
-    controls: [intensityControl],
-    layers: [
-      {
-        property: "scale",
-        from: 1,
-        to: 1.35,
-        target: "outgoing",
-        param: "intensity",
-      },
-      {
-        property: "scale",
-        from: 1.35,
-        to: 1,
-        target: "incoming",
-        param: "intensity",
-      },
-      {
         property: "blur",
         from: 0,
-        to: 12,
-        target: "both",
-        start: 0,
-        end: 0.5,
-        param: "intensity",
-      },
-      {
-        property: "blur",
-        from: 12,
-        to: 0,
-        target: "both",
-        start: 0.5,
-        end: 1,
-        param: "intensity",
-      },
-      ...opacityCross,
-    ],
-  }),
-  xfade("crossblur", "Cross Blur", "#A855F7", "hblur", {
-    category: "zoom",
-    renderer: "primitive",
-    version: 1,
-    parameters: intensityParam,
-    controls: [intensityControl],
-    layers: [
-      {
-        property: "blur",
-        from: 0,
-        to: 14,
+        to: 6,
         target: "outgoing",
-        start: 0,
         end: 0.55,
-        param: "intensity",
-      },
-      {
-        property: "blur",
-        from: 14,
-        to: 0,
-        target: "incoming",
-        start: 0.45,
-        end: 1,
-        param: "intensity",
-      },
-      ...opacityCross,
-    ],
-  }),
-];
-
-const EFFECT: TransitionItemDto[] = [
-  xfade("flash", "Flash", "#FDE68A", "fadewhite", {
-    category: "effect",
-    defaultDurationMs: 250,
-    minDurationMs: 80,
-    maxDurationMs: 800,
-    parameters: intensityParam,
-    controls: [intensityControl],
-    layers: flashLayers,
-    renderer: "primitive",
-    version: 2,
-  }),
-  xfade("mosaic", "Mosaic", "#FACC15", "pixelize", {
-    category: "effect",
-    renderer: "primitive",
-    layers: [
-      {
-        property: "scale",
-        from: 1,
-        to: 0.2,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0,
-        end: 0.5,
-      },
-      {
-        property: "blur",
-        from: 0,
-        to: 8,
-        target: "outgoing",
-        start: 0,
-        end: 0.5,
       },
       {
         property: "opacity",
@@ -951,110 +989,103 @@ const EFFECT: TransitionItemDto[] = [
         to: 0,
         target: "outgoing",
         start: 0.35,
-        end: 0.6,
+        end: 0.7,
       },
       {
         property: "scale",
-        from: 0.2,
+        from: 1.6,
         to: 1,
         easing: "easeOut",
         target: "incoming",
-        start: 0.5,
-        end: 1,
+        param: "intensity",
       },
       {
         property: "blur",
-        from: 8,
+        from: 6,
         to: 0,
         target: "incoming",
-        start: 0.5,
-        end: 1,
+        start: 0.45,
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
         target: "incoming",
-        start: 0.4,
+        start: 0.3,
         end: 0.65,
       },
     ],
+    parameters: intensityParam,
+    controls: [intensityControl],
   }),
-  xfade("ripple", "Ripple", "#38BDF8", "dissolve", {
-    category: "effect",
+  xfade("ripple", TITLES.ripple, "#06B6D4", "hblur", {
+    category: "basic",
     renderer: "primitive",
     layers: [
       {
-        property: "scale",
-        from: 1,
-        to: 1.12,
-        easing: "easeOut",
-        target: "outgoing",
-        start: 0,
-        end: 0.5,
-      },
-      {
-        property: "scale",
-        from: 1.12,
-        to: 1,
-        easing: "easeIn",
-        target: "outgoing",
-        start: 0.5,
-        end: 1,
-      },
-      {
         property: "blur",
         from: 0,
-        to: 6,
-        target: "both",
-        start: 0,
+        to: 10,
+        target: "outgoing",
+        end: 0.5,
+        param: "intensity",
+      },
+      {
+        property: "scale",
+        from: 1,
+        to: 1.08,
+        target: "outgoing",
         end: 0.5,
       },
       {
-        property: "blur",
-        from: 6,
+        property: "opacity",
+        from: 1,
         to: 0,
-        target: "both",
-        start: 0.5,
-        end: 1,
+        target: "outgoing",
+        start: 0.3,
+        end: 0.65,
       },
-      ...opacityCross,
+      {
+        property: "blur",
+        from: 10,
+        to: 0,
+        target: "incoming",
+        start: 0.45,
+        param: "intensity",
+      },
+      {
+        property: "scale",
+        from: 1.08,
+        to: 1,
+        target: "incoming",
+        start: 0.45,
+      },
+      {
+        property: "opacity",
+        from: 0,
+        to: 1,
+        target: "incoming",
+        start: 0.3,
+        end: 0.65,
+      },
     ],
+    parameters: intensityParam,
+    controls: [intensityControl],
   }),
 ];
 
-const TRENDING: TransitionItemDto[] = [
-  BASIC.find((i) => i.id === "fade")!,
-  ZOOM.find((i) => i.id === "cursorzoom")!,
-  EFFECT.find((i) => i.id === "flash")!,
-  MOTION.find((i) => i.id === "pushleft")!,
-  ZOOM.find((i) => i.id === "crosszoom")!,
-  MOTION.find((i) => i.id === "slideleft")!,
-].map((item) => ({ ...item, category: "trending" }));
-
-function uniqueItems(groups: TransitionItemDto[][]): TransitionItemDto[] {
-  const byId = new Map<string, TransitionItemDto>();
-  for (const group of groups) {
-    for (const item of group) {
-      byId.set(item.id, item);
-    }
-  }
-  return Array.from(byId.values());
-}
-
-/** Catalog aligned to docs/transitions-spec.md */
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 8,
+  version: 11,
   baseUrl: "",
   categories: [
-    { id: "trending", title: "Trending", items: TRENDING },
-    { id: "basic", title: "Basic", items: BASIC },
-    { id: "motion", title: "Motion", items: MOTION },
-    { id: "wipe", title: "Wipe", items: WIPE },
-    { id: "zoom", title: "Zoom", items: ZOOM },
-    { id: "effect", title: "Effect", items: EFFECT },
+    {
+      id: "basic",
+      title: CATEGORY_BASIC_TITLES.en,
+      titles: CATEGORY_BASIC_TITLES,
+      items: BASIC,
+    },
   ],
-  items: uniqueItems([BASIC, MOTION, WIPE, ZOOM, EFFECT]),
+  items: BASIC,
 };
 
 export function buildTransitionCatalog(): TransitionCatalogDto {
