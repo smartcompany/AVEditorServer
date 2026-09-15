@@ -114,9 +114,15 @@ type XfadeOpts = {
   controls?: TransitionControlDto[];
   /** When set, renderer becomes primitive but still exports via ffmpegName. */
   renderer?: TransitionRenderer;
-  /** Client special-case compositor id (e.g. doorway). */
+  /**
+   * Legacy alias for `effect.kind`. Prefer `effect: { kind, …params }`.
+   * Client never matches on catalog item id.
+   */
   customId?: string;
-  /** Optional server-driven effect DSL for specialized compositors. */
+  /**
+   * Server-driven effect DSL. `kind` selects a built-in client compositor
+   * (doorway / puzzle / …); remaining keys are compositor params.
+   */
   effect?: Record<string, unknown>;
   version?: number;
 };
@@ -586,7 +592,7 @@ const BASIC: TransitionItemDto[] = [
       {
         property: "scale",
         from: 1,
-        to: 0.4,
+        to: 0,
         easing: "easeIn",
         target: "outgoing",
       },
@@ -600,9 +606,14 @@ const BASIC: TransitionItemDto[] = [
   }),
   xfade("doorway", TITLES.doorway, "#84CC16", "horzopen", {
     category: "basic",
-    renderer: "primitive",
+    renderer: "custom",
+    // Server picks the client compositor via effect.kind — never by catalog id.
     customId: "doorway",
-    // Preview uses a dedicated doorway compositor (A splits L/R, B comes through).
+    effect: {
+      kind: "doorway",
+      incomingScaleFrom: 0.84,
+      incomingScaleTo: 1,
+    },
     layers: [],
   }),
   xfade("swap", TITLES.swap, "#A3E635", "slideleft", {
@@ -754,15 +765,22 @@ const BASIC: TransitionItemDto[] = [
   }),
   xfade("puzzleleft", TITLES.puzzleleft, "#FB923C", "wipeleft", {
     category: "basic",
-    renderer: "primitive",
-    customId: "puzzleleft",
-    // Preview: B split into 3 vertical strips that slide in sequentially.
+    renderer: "custom",
+    customId: "puzzle",
+    effect: {
+      kind: "puzzle",
+      reverse: false,
+    },
     layers: [],
   }),
   xfade("puzzleright", TITLES.puzzleright, "#F97316", "wiperight", {
     category: "basic",
-    renderer: "primitive",
-    customId: "puzzleright",
+    renderer: "custom",
+    customId: "puzzle",
+    effect: {
+      kind: "puzzle",
+      reverse: true,
+    },
     layers: [],
   }),
   xfade("crosszoom", TITLES.crosszoom, "#22D3EE", "fade", {
@@ -876,7 +894,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 25,
+  version: 26,
   baseUrl: "",
   categories: [
     {
