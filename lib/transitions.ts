@@ -79,9 +79,7 @@ export type TransitionItemDto = {
   shader?: string;
   customId?: string;
   /**
-   * Server-driven effect DSL consumed by the client Transition Engine.
-   * Example (ripple):
-   * `{ type: "distortion", shape: "radial", source: "wave", wave: {...}, center: [0.5,0.5] }`
+   * Optional server-driven effect DSL for specialized compositors.
    */
   effect?: Record<string, unknown>;
   downloadSizeBytes?: number;
@@ -118,7 +116,7 @@ type XfadeOpts = {
   renderer?: TransitionRenderer;
   /** Client special-case compositor id (e.g. doorway). */
   customId?: string;
-  /** Server-driven effect DSL (distortion / wave / …). */
+  /** Optional server-driven effect DSL for specialized compositors. */
   effect?: Record<string, unknown>;
   version?: number;
 };
@@ -824,29 +822,61 @@ const BASIC: TransitionItemDto[] = [
   xfade("ripple", TITLES.ripple, "#06B6D4", "hblur", {
     category: "basic",
     renderer: "primitive",
-    customId: "radialWave",
-    version: 2,
-    // Preview uses the radialWave engine (concentric waves from center).
-    // Params are server-owned; client does not hardcode ripple look.
-    layers: [],
-    effect: {
-      type: "distortion",
-      shape: "radial",
-      source: "wave",
-      wave: {
-        frequency: 28,
-        amplitude: 0.045,
-        width: 0.14,
+    layers: [
+      {
+        property: "blur",
+        from: 0,
+        to: 10,
+        target: "outgoing",
+        end: 0.5,
+        param: "intensity",
       },
-      center: [0.5, 0.5],
-    },
+      {
+        property: "scale",
+        from: 1,
+        to: 1.08,
+        target: "outgoing",
+        end: 0.5,
+      },
+      {
+        property: "opacity",
+        from: 1,
+        to: 0,
+        target: "outgoing",
+        start: 0.3,
+        end: 0.65,
+      },
+      {
+        property: "blur",
+        from: 10,
+        to: 0,
+        target: "incoming",
+        start: 0.45,
+        param: "intensity",
+      },
+      {
+        property: "scale",
+        from: 1.08,
+        to: 1,
+        target: "incoming",
+        start: 0.45,
+      },
+      {
+        property: "opacity",
+        from: 0,
+        to: 1,
+        target: "incoming",
+        start: 0.3,
+        end: 0.65,
+      },
+    ],
     parameters: intensityParam,
     controls: [intensityControl],
   }),
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 24,
+  version: 25,
   baseUrl: "",
   categories: [
     {
