@@ -189,13 +189,15 @@ const TITLES = {
   },
   spinin: {
     en: "Spin In",
-    ko: "안으로 회전",
+    // Incoming grows from center while rotating — reads as "outward".
+    ko: "밖으로 회전",
     ja: "スピンイン",
     zh: "旋入",
   },
   spinout: {
     en: "Spin Out",
-    ko: "밖으로 회전",
+    // Outgoing shrinks toward center while rotating — reads as "inward".
+    ko: "안으로 회전",
     ja: "スピンアウト",
     zh: "旋出",
   },
@@ -844,7 +846,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 23,
+  version: 24,
   baseUrl: "",
   categories: [
     {
