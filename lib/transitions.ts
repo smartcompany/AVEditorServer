@@ -791,34 +791,44 @@ const BASIC: TransitionItemDto[] = [
   xfade("crosszoom", TITLES.crosszoom, "#22D3EE", "fade", {
     category: "basic",
     renderer: "primitive",
-    // iMovie-style: zoom into A with radial streaks → white light flash →
-    // zoom out of B. All motion is server layer vectors (no client special-case).
+    // iMovie Cross Zoom (from reference recording):
+    // radial light streaks from center (not a flat white card) + slight spin,
+    // then settle into B. Authored entirely as server layer vectors.
     layers: [
       {
         property: "scale",
         from: 1,
-        to: 3.2,
+        to: 2.8,
         easing: "easeIn",
         target: "outgoing",
         param: "intensity",
-        end: 0.55,
+        end: 0.52,
+      },
+      {
+        property: "rotation",
+        from: 0,
+        to: 0.08,
+        easing: "easeIn",
+        target: "outgoing",
+        end: 0.52,
       },
       {
         property: "blur",
         from: 0,
-        to: 18,
+        to: 22,
         target: "outgoing",
-        end: 0.55,
+        end: 0.52,
         param: "intensity",
         mode: "zoom",
       },
       {
+        // Mild lift only — streaks carry the “light”, not a full white wash.
         property: "brightness",
         from: 0,
-        to: 1,
+        to: 0.45,
         easing: "easeIn",
         target: "outgoing",
-        start: 0.2,
+        start: 0.25,
         end: 0.5,
       },
       {
@@ -826,43 +836,51 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 0,
         target: "outgoing",
-        start: 0.4,
+        start: 0.42,
         end: 0.55,
       },
       {
         property: "scale",
-        from: 3.2,
+        from: 2.8,
         to: 1,
         easing: "easeOut",
         target: "incoming",
         param: "intensity",
-        start: 0.45,
+        start: 0.48,
+      },
+      {
+        property: "rotation",
+        from: -0.08,
+        to: 0,
+        easing: "easeOut",
+        target: "incoming",
+        start: 0.48,
       },
       {
         property: "blur",
-        from: 18,
+        from: 22,
         to: 0,
         target: "incoming",
-        start: 0.45,
+        start: 0.48,
         param: "intensity",
         mode: "zoom",
       },
       {
         property: "brightness",
-        from: 1,
+        from: 0.45,
         to: 0,
         easing: "easeOut",
         target: "incoming",
         start: 0.5,
-        end: 0.9,
+        end: 0.85,
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
         target: "incoming",
-        start: 0.45,
-        end: 0.6,
+        start: 0.48,
+        end: 0.62,
       },
     ],
     parameters: intensityParam,
@@ -925,7 +943,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 28,
+  version: 29,
   baseUrl: "",
   categories: [
     {
