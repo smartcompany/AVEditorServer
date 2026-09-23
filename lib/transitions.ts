@@ -32,6 +32,11 @@ export type TransitionLayerDto = {
    * `parameters[param]` (e.g. intensity). Authors write values at param=1.
    */
   param?: string;
+  /**
+   * Optional renderer hint. For `blur`: `"zoom"` = radial zoom blur
+   * (iMovie Cross Zoom light streaks); omit / `"gaussian"` = soft blur.
+   */
+  mode?: string;
 };
 
 export type TransitionParameterDto = {
@@ -786,52 +791,78 @@ const BASIC: TransitionItemDto[] = [
   xfade("crosszoom", TITLES.crosszoom, "#22D3EE", "fade", {
     category: "basic",
     renderer: "primitive",
+    // iMovie-style: zoom into A with radial streaks → white light flash →
+    // zoom out of B. All motion is server layer vectors (no client special-case).
     layers: [
       {
         property: "scale",
         from: 1,
-        to: 1.6,
+        to: 3.2,
         easing: "easeIn",
         target: "outgoing",
         param: "intensity",
+        end: 0.55,
       },
       {
         property: "blur",
         from: 0,
-        to: 6,
+        to: 18,
         target: "outgoing",
         end: 0.55,
+        param: "intensity",
+        mode: "zoom",
+      },
+      {
+        property: "brightness",
+        from: 0,
+        to: 1,
+        easing: "easeIn",
+        target: "outgoing",
+        start: 0.2,
+        end: 0.5,
       },
       {
         property: "opacity",
         from: 1,
         to: 0,
         target: "outgoing",
-        start: 0.35,
-        end: 0.7,
+        start: 0.4,
+        end: 0.55,
       },
       {
         property: "scale",
-        from: 1.6,
+        from: 3.2,
         to: 1,
         easing: "easeOut",
         target: "incoming",
         param: "intensity",
+        start: 0.45,
       },
       {
         property: "blur",
-        from: 6,
+        from: 18,
         to: 0,
         target: "incoming",
         start: 0.45,
+        param: "intensity",
+        mode: "zoom",
+      },
+      {
+        property: "brightness",
+        from: 1,
+        to: 0,
+        easing: "easeOut",
+        target: "incoming",
+        start: 0.5,
+        end: 0.9,
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
         target: "incoming",
-        start: 0.3,
-        end: 0.65,
+        start: 0.45,
+        end: 0.6,
       },
     ],
     parameters: intensityParam,
@@ -894,7 +925,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 27,
+  version: 28,
   baseUrl: "",
   categories: [
     {
