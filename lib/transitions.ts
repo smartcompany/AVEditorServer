@@ -18,11 +18,14 @@ export type TransitionLayerDto = {
     | "blur"
     | "brightness"
     | "saturation"
-    | "contrast";
+    | "contrast"
+    /** Progressive clip. 0 = full clip, 1 = fully wiped away. `mode` = edge. */
+    | "wipe";
   from: number;
   to: number;
   easing?: string;
-  target?: "outgoing" | "incoming" | "both";
+  /** Which clip: `A` (leaving) | `B` (entering) | `both`. */
+  target?: "A" | "B" | "both";
   bezier?: number[];
   /** Normalized progress window [0,1]. Defaults to full span. */
   start?: number;
@@ -33,8 +36,9 @@ export type TransitionLayerDto = {
    */
   param?: string;
   /**
-   * Optional renderer hint. For `blur`: `"zoom"` = radial zoom blur
-   * (iMovie Cross Zoom light streaks); omit / `"gaussian"` = soft blur.
+   * Optional renderer hint.
+   * - `blur`: `"zoom"` = radial; omit / `"gaussian"` = soft.
+   * - `wipe`: edge erased first — `"left"` | `"right"` | `"top"` | `"bottom"`.
    */
   mode?: string;
 };
@@ -126,7 +130,7 @@ type XfadeOpts = {
   customId?: string;
   /**
    * Server-driven effect DSL. `kind` selects a built-in client compositor
-   * (doorway / puzzle / …); remaining keys are compositor params.
+   * (doorway / puzzle / wipe / …); remaining keys are compositor params.
    */
   effect?: Record<string, unknown>;
   version?: number;
@@ -334,14 +338,14 @@ const opacityCross: TransitionLayerDto[] = [
     from: 1,
     to: 0,
     easing: "easeInOut",
-    target: "outgoing",
+    target: "A",
   },
   {
     property: "opacity",
     from: 0,
     to: 1,
     easing: "easeInOut",
-    target: "incoming",
+    target: "B",
   },
 ];
 
@@ -356,26 +360,26 @@ function slideLayers(
       from: 0,
       to: -dir,
       easing: "easeInOut",
-      target: "outgoing",
+      target: "A",
     },
     {
       property: axis,
       from: dir,
       to: 0,
       easing: "easeInOut",
-      target: "incoming",
+      target: "B",
     },
     {
       property: "opacity",
       from: 1,
       to: 1,
-      target: "outgoing",
+      target: "A",
     },
     {
       property: "opacity",
       from: 1,
       to: 1,
-      target: "incoming",
+      target: "B",
     },
   ];
 }
@@ -391,26 +395,26 @@ function pushLayers(
       from: 0,
       to: -dir,
       easing: "easeInOut",
-      target: "outgoing",
+      target: "A",
     },
     {
       property: axis,
       from: dir,
       to: 0,
       easing: "easeInOut",
-      target: "incoming",
+      target: "B",
     },
     {
       property: "opacity",
       from: 1,
       to: 1,
-      target: "outgoing",
+      target: "A",
     },
     {
       property: "opacity",
       from: 1,
       to: 1,
-      target: "incoming",
+      target: "B",
     },
   ];
 }
@@ -427,14 +431,14 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 0,
         easing: "linear",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
         easing: "linear",
-        target: "incoming",
+        target: "B",
       },
     ],
   }),
@@ -447,7 +451,7 @@ const BASIC: TransitionItemDto[] = [
         from: 0,
         to: 12,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
         end: 0.55,
         param: "intensity",
       },
@@ -456,7 +460,7 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 0,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
         start: 0.25,
         end: 0.7,
       },
@@ -465,7 +469,7 @@ const BASIC: TransitionItemDto[] = [
         from: 12,
         to: 0,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
         start: 0.35,
         param: "intensity",
       },
@@ -474,7 +478,7 @@ const BASIC: TransitionItemDto[] = [
         from: 0,
         to: 1,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
         start: 0.3,
         end: 0.75,
       },
@@ -494,14 +498,14 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 0,
         easing: "easeInOut",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
         easing: "easeInOut",
-        target: "incoming",
+        target: "B",
       },
       {
         property: "brightness",
@@ -532,14 +536,14 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 0,
         easing: "easeInOut",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
         easing: "easeInOut",
-        target: "incoming",
+        target: "B",
       },
       {
         property: "brightness",
@@ -564,42 +568,54 @@ const BASIC: TransitionItemDto[] = [
   xfade("spinin", TITLES.spinin, "#65A30D", "circleopen", {
     category: "basic",
     renderer: "primitive",
-    // A stays as a solid backdrop; B spins/scales in on top.
+    // Paint order = last A/B target. A is static backdrop; B mover is last → on top.
     layers: [
+      {
+        property: "scale",
+        from: 1,
+        to: 1,
+        target: "A",
+      },
       {
         property: "rotation",
         from: -0.12,
         to: 0,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
       },
       {
         property: "scale",
         from: 0,
         to: 1,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
       },
     ],
   }),
   xfade("spinout", TITLES.spinout, "#4D7C0F", "circleclose", {
     category: "basic",
     renderer: "primitive",
-    // B is already the full backdrop; A spins/scales away on top.
+    // B static backdrop first; A mover last → A on top (no client z-order inference).
     layers: [
+      {
+        property: "scale",
+        from: 1,
+        to: 1,
+        target: "B",
+      },
       {
         property: "rotation",
         from: 0,
         to: 0.12,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "scale",
         from: 1,
         to: 0,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
       },
     ],
   }),
@@ -630,20 +646,20 @@ const BASIC: TransitionItemDto[] = [
         from: 0,
         to: -1,
         easing: "easeInOut",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "translateX",
         from: 1,
         to: 0,
         easing: "easeInOut",
-        target: "incoming",
+        target: "B",
       },
       {
         property: "scale",
         from: 1,
         to: 0.92,
-        target: "outgoing",
+        target: "A",
         start: 0,
         end: 0.5,
       },
@@ -651,7 +667,7 @@ const BASIC: TransitionItemDto[] = [
         property: "scale",
         from: 0.92,
         to: 1,
-        target: "incoming",
+        target: "B",
         start: 0.5,
         end: 1,
       },
@@ -667,20 +683,20 @@ const BASIC: TransitionItemDto[] = [
         from: 0,
         to: -1,
         easing: "easeInOut",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "scale",
         from: 1,
         to: 0.85,
         easing: "easeInOut",
-        target: "outgoing",
+        target: "A",
       },
       {
         property: "opacity",
         from: 1,
         to: 0.6,
-        target: "outgoing",
+        target: "A",
         end: 0.55,
       },
       {
@@ -688,20 +704,20 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 0,
         easing: "easeInOut",
-        target: "incoming",
+        target: "B",
       },
       {
         property: "scale",
         from: 0.85,
         to: 1,
         easing: "easeInOut",
-        target: "incoming",
+        target: "B",
       },
       {
         property: "opacity",
         from: 0.6,
         to: 1,
-        target: "incoming",
+        target: "B",
         start: 0.45,
       },
     ],
@@ -714,7 +730,7 @@ const BASIC: TransitionItemDto[] = [
         property: "blur",
         from: 0,
         to: 8,
-        target: "outgoing",
+        target: "A",
         end: 0.5,
         param: "intensity",
       },
@@ -722,7 +738,7 @@ const BASIC: TransitionItemDto[] = [
         property: "opacity",
         from: 1,
         to: 0,
-        target: "outgoing",
+        target: "A",
         start: 0.35,
         end: 0.65,
       },
@@ -730,7 +746,7 @@ const BASIC: TransitionItemDto[] = [
         property: "blur",
         from: 8,
         to: 0,
-        target: "incoming",
+        target: "B",
         start: 0.5,
         param: "intensity",
       },
@@ -738,7 +754,7 @@ const BASIC: TransitionItemDto[] = [
         property: "opacity",
         from: 0,
         to: 1,
-        target: "incoming",
+        target: "B",
         start: 0.35,
         end: 0.65,
       },
@@ -748,15 +764,65 @@ const BASIC: TransitionItemDto[] = [
   }),
   xfade("wipeleft", TITLES.wipeleft, "#34D399", "wipeleft", {
     category: "basic",
+    renderer: "primitive",
+    // B full underneath; A wiped away from the right edge.
+    layers: [
+      { property: "scale", from: 1, to: 1, target: "B" },
+      {
+        property: "wipe",
+        from: 0,
+        to: 1,
+        easing: "linear",
+        target: "A",
+        mode: "right",
+      },
+    ],
   }),
   xfade("wiperight", TITLES.wiperight, "#2DD4BF", "wiperight", {
     category: "basic",
+    renderer: "primitive",
+    // B full underneath; A wiped away from the left (edge travels right).
+    layers: [
+      { property: "scale", from: 1, to: 1, target: "B" },
+      {
+        property: "wipe",
+        from: 0,
+        to: 1,
+        easing: "linear",
+        target: "A",
+        mode: "left",
+      },
+    ],
   }),
   xfade("wipeup", TITLES.wipeup, "#5EEAD4", "wipeup", {
     category: "basic",
+    renderer: "primitive",
+    layers: [
+      { property: "scale", from: 1, to: 1, target: "B" },
+      {
+        property: "wipe",
+        from: 0,
+        to: 1,
+        easing: "linear",
+        target: "A",
+        mode: "top",
+      },
+    ],
   }),
   xfade("wipedown", TITLES.wipedown, "#14B8A6", "wipedown", {
     category: "basic",
+    renderer: "primitive",
+    layers: [
+      { property: "scale", from: 1, to: 1, target: "B" },
+      {
+        property: "wipe",
+        from: 0,
+        to: 1,
+        easing: "linear",
+        target: "A",
+        mode: "bottom",
+      },
+    ],
   }),
   xfade("slideleft", TITLES.slideleft, "#FBBF24", "slideleft", {
     category: "basic",
@@ -800,7 +866,7 @@ const BASIC: TransitionItemDto[] = [
         from: 1,
         to: 2.8,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
         param: "intensity",
         end: 0.52,
       },
@@ -809,14 +875,14 @@ const BASIC: TransitionItemDto[] = [
         from: 0,
         to: 0.08,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
         end: 0.52,
       },
       {
         property: "blur",
         from: 0,
         to: 22,
-        target: "outgoing",
+        target: "A",
         end: 0.52,
         param: "intensity",
         mode: "zoom",
@@ -827,7 +893,7 @@ const BASIC: TransitionItemDto[] = [
         from: 0,
         to: 0.45,
         easing: "easeIn",
-        target: "outgoing",
+        target: "A",
         start: 0.25,
         end: 0.5,
       },
@@ -835,7 +901,7 @@ const BASIC: TransitionItemDto[] = [
         property: "opacity",
         from: 1,
         to: 0,
-        target: "outgoing",
+        target: "A",
         start: 0.42,
         end: 0.55,
       },
@@ -844,7 +910,7 @@ const BASIC: TransitionItemDto[] = [
         from: 2.8,
         to: 1,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
         param: "intensity",
         start: 0.48,
       },
@@ -853,14 +919,14 @@ const BASIC: TransitionItemDto[] = [
         from: -0.08,
         to: 0,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
         start: 0.48,
       },
       {
         property: "blur",
         from: 22,
         to: 0,
-        target: "incoming",
+        target: "B",
         start: 0.48,
         param: "intensity",
         mode: "zoom",
@@ -870,7 +936,7 @@ const BASIC: TransitionItemDto[] = [
         from: 0.45,
         to: 0,
         easing: "easeOut",
-        target: "incoming",
+        target: "B",
         start: 0.5,
         end: 0.85,
       },
@@ -878,7 +944,7 @@ const BASIC: TransitionItemDto[] = [
         property: "opacity",
         from: 0,
         to: 1,
-        target: "incoming",
+        target: "B",
         start: 0.48,
         end: 0.62,
       },
@@ -894,7 +960,7 @@ const BASIC: TransitionItemDto[] = [
         property: "blur",
         from: 0,
         to: 10,
-        target: "outgoing",
+        target: "A",
         end: 0.5,
         param: "intensity",
       },
@@ -902,14 +968,14 @@ const BASIC: TransitionItemDto[] = [
         property: "scale",
         from: 1,
         to: 1.08,
-        target: "outgoing",
+        target: "A",
         end: 0.5,
       },
       {
         property: "opacity",
         from: 1,
         to: 0,
-        target: "outgoing",
+        target: "A",
         start: 0.3,
         end: 0.65,
       },
@@ -917,7 +983,7 @@ const BASIC: TransitionItemDto[] = [
         property: "blur",
         from: 10,
         to: 0,
-        target: "incoming",
+        target: "B",
         start: 0.45,
         param: "intensity",
       },
@@ -925,14 +991,14 @@ const BASIC: TransitionItemDto[] = [
         property: "scale",
         from: 1.08,
         to: 1,
-        target: "incoming",
+        target: "B",
         start: 0.45,
       },
       {
         property: "opacity",
         from: 0,
         to: 1,
-        target: "incoming",
+        target: "B",
         start: 0.3,
         end: 0.65,
       },
@@ -943,7 +1009,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 29,
+  version: 37,
   baseUrl: "",
   categories: [
     {

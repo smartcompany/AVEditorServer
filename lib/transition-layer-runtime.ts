@@ -10,11 +10,15 @@ export type LayerPose = {
   blur: number;
   brightness: number;
   blurMode: string;
+  /** 0 = full, 1 = fully wiped away. */
+  wipe: number;
+  /** Edge erased first: left | right | top | bottom. */
+  wipeEdge: string;
 };
 
 export type LayerEvaluation = {
-  outgoing: LayerPose;
-  incoming: LayerPose;
+  a: LayerPose;
+  b: LayerPose;
 };
 
 const identityPose = (): LayerPose => ({
@@ -26,6 +30,8 @@ const identityPose = (): LayerPose => ({
   blur: 0,
   brightness: 0,
   blurMode: "",
+  wipe: 0,
+  wipeEdge: "left",
 });
 
 function ease(easing: string | undefined, t: number): number {
@@ -83,6 +89,12 @@ function applyProperty(
       };
     case "brightness":
       return { ...pose, brightness: value };
+    case "wipe":
+      return {
+        ...pose,
+        wipe: Math.min(1, Math.max(0, value)),
+        wipeEdge: (layer.mode ?? pose.wipeEdge || "left").toLowerCase(),
+      };
     default:
       return pose;
   }
@@ -95,12 +107,12 @@ export function evaluateTransitionLayers(
   parameters: Record<string, number> = {},
 ): LayerEvaluation {
   const progress = Math.min(1, Math.max(0, t));
-  let outgoing = identityPose();
-  let incoming = { ...identityPose(), opacity: 0 };
+  let a = identityPose();
+  let b = { ...identityPose(), opacity: 0 };
 
   const hasOpacity = layers.some((l) => l.property === "opacity");
-  let outgoingOpacitySet = false;
-  let incomingOpacitySet = false;
+  let aOpacitySet = false;
+  let bOpacitySet = false;
 
   for (const layer of layers) {
     const windowStart = Math.min(1, Math.max(0, layer.start ?? 0));
@@ -119,44 +131,45 @@ export function evaluateTransitionLayers(
       value = from + (to - from) * ease(layer.easing, local);
     }
 
-    const target = layer.target ?? "outgoing";
-    if (target === "outgoing" || target === "both") {
-      outgoing = applyProperty(outgoing, layer, value);
-      if (layer.property === "opacity") outgoingOpacitySet = true;
+    const target = layer.target ?? "A";
+    if (target === "A" || target === "both") {
+      a = applyProperty(a, layer, value);
+      if (layer.property === "opacity") aOpacitySet = true;
     }
-    if (target === "incoming" || target === "both") {
-      incoming = applyProperty(incoming, layer, value);
-      if (layer.property === "opacity") incomingOpacitySet = true;
+    if (target === "B" || target === "both") {
+      b = applyProperty(b, layer, value);
+      if (layer.property === "opacity") bOpacitySet = true;
     }
   }
 
   if (!hasOpacity) {
-    const spatial = layers.some(
+    const solid = layers.some(
       (l) =>
         l.property === "translateX" ||
         l.property === "translateY" ||
-        l.property === "rotation",
+        l.property === "rotation" ||
+        l.property === "wipe",
     );
-    if (spatial) {
-      outgoing = { ...outgoing, opacity: 1 };
-      incoming = { ...incoming, opacity: 1 };
+    if (solid) {
+      a = { ...a, opacity: 1 };
+      b = { ...b, opacity: 1 };
     } else {
-      outgoing = { ...outgoing, opacity: 1 - progress };
-      incoming = { ...incoming, opacity: progress };
+      a = { ...a, opacity: 1 - progress };
+      b = { ...b, opacity: progress };
     }
-  } else if (outgoingOpacitySet && !incomingOpacitySet) {
-    incoming = {
-      ...incoming,
-      opacity: Math.min(1, Math.max(0, 1 - outgoing.opacity)),
+  } else if (aOpacitySet && !bOpacitySet) {
+    b = {
+      ...b,
+      opacity: Math.min(1, Math.max(0, 1 - a.opacity)),
     };
-  } else if (incomingOpacitySet && !outgoingOpacitySet) {
-    outgoing = {
-      ...outgoing,
-      opacity: Math.min(1, Math.max(0, 1 - incoming.opacity)),
+  } else if (bOpacitySet && !aOpacitySet) {
+    a = {
+      ...a,
+      opacity: Math.min(1, Math.max(0, 1 - b.opacity)),
     };
   }
 
-  return { outgoing, incoming };
+  return { a, b };
 }
 
 function isActivelyTransformed(pose: LayerPose): boolean {
@@ -164,48 +177,50 @@ function isActivelyTransformed(pose: LayerPose): boolean {
     Math.abs(pose.rotation) > 0.001 ||
     Math.abs(pose.scale - 1) > 0.01 ||
     Math.abs(pose.translateX) > 0.01 ||
-    Math.abs(pose.translateY) > 0.01
+    Math.abs(pose.translateY) > 0.01 ||
+    pose.wipe > 0.001
   );
-}
-
-function layerIsSpatial(layer: TransitionLayerDto): boolean {
-  return (
-    layer.property === "rotation" ||
-    layer.property === "scale" ||
-    layer.property === "translateX" ||
-    layer.property === "translateY"
-  );
-}
-
-function targetHasSpatialLayers(
-  layers: TransitionLayerDto[],
-  target: "outgoing" | "incoming",
-): boolean {
-  return layers.some((layer) => {
-    if (!layerIsSpatial(layer)) return false;
-    const t = layer.target ?? "outgoing";
-    return t === target || t === "both";
-  });
 }
 
 /**
- * Spin-out style: A transforms over a static full-frame B → paint A on top.
- * Mirrors Flutter `outgoingShouldPaintOnTop`.
+ * Paint order from catalog: last layer with `target` `A` or `B` is on top
+ * (`both` does not change order). Put the mover last. Identity layers on the
+ * other clip document the backdrop without needing client inference.
  */
-export function outgoingShouldPaintOnTop(
+export function aShouldPaintOnTop(
   evalResult: LayerEvaluation,
   layers: TransitionLayerDto[] = [],
 ): boolean {
   if (layers.length > 0) {
-    return (
-      targetHasSpatialLayers(layers, "outgoing") &&
-      !targetHasSpatialLayers(layers, "incoming")
-    );
+    let top: "A" | "B" | null = null;
+    for (const layer of layers) {
+      const t = layer.target ?? "A";
+      if (t === "A" || t === "B") top = t;
+    }
+    if (top == null) return false;
+    return top === "A";
   }
   return (
-    isActivelyTransformed(evalResult.outgoing) &&
-    !isActivelyTransformed(evalResult.incoming)
+    isActivelyTransformed(evalResult.a) && !isActivelyTransformed(evalResult.b)
   );
+}
+
+/** CSS inset for wipe: amount 0 = full, 1 = gone. Edge = side erased first. */
+export function wipeClipPath(wipe: number, edge: string): string | undefined {
+  const w = Math.min(1, Math.max(0, wipe));
+  if (w <= 0.001) return undefined;
+  const pct = `${(w * 100).toFixed(2)}%`;
+  switch ((edge || "left").toLowerCase()) {
+    case "right":
+      return `inset(0 ${pct} 0 0)`;
+    case "top":
+      return `inset(${pct} 0 0 0)`;
+    case "bottom":
+      return `inset(0 0 ${pct} 0)`;
+    case "left":
+    default:
+      return `inset(0 0 0 ${pct})`;
+  }
 }
 
 export function poseToCss(pose: LayerPose): CSSProperties {
@@ -223,5 +238,6 @@ export function poseToCss(pose: LayerPose): CSSProperties {
       `scale(${pose.scale * zoomExtra})`,
     ].join(" "),
     filter: blur > 0.3 ? `blur(${blur}px)` : undefined,
+    clipPath: wipeClipPath(pose.wipe, pose.wipeEdge),
   };
 }

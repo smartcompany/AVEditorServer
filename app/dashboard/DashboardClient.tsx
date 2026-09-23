@@ -8,7 +8,7 @@ import type {
 } from "@/lib/transitions";
 import {
   evaluateTransitionLayers,
-  outgoingShouldPaintOnTop,
+  aShouldPaintOnTop,
   poseToCss,
 } from "@/lib/transition-layer-runtime";
 
@@ -175,15 +175,12 @@ export default function DashboardClient({ initialCatalog }: Props) {
     return <p style={{ padding: 24 }}>No transitions in catalog.</p>;
   }
 
-  const outCss = poseToCss(evaluation.outgoing);
-  const inCss = poseToCss(evaluation.incoming);
-  const outBright = evaluation.outgoing.brightness;
-  const inBright = evaluation.incoming.brightness;
+  const outCss = poseToCss(evaluation.a);
+  const inCss = poseToCss(evaluation.b);
+  const outBright = evaluation.a.brightness;
+  const inBright = evaluation.b.brightness;
   // Match Flutter: spin-out paints A over static B; spin-in paints B over A.
-  const aOnTop = outgoingShouldPaintOnTop(
-    evaluation,
-    selected.layers ?? [],
-  );
+  const aOnTop = aShouldPaintOnTop(evaluation, selected.layers ?? []);
 
   const clipA = (
     <div
@@ -194,7 +191,7 @@ export default function DashboardClient({ initialCatalog }: Props) {
         zIndex: aOnTop ? 2 : 1,
       }}
     >
-      <span>A · outgoing</span>
+      <span>A</span>
       {Math.abs(outBright) > 0.001 && (
         <div
           style={{
@@ -217,7 +214,7 @@ export default function DashboardClient({ initialCatalog }: Props) {
         zIndex: aOnTop ? 1 : 2,
       }}
     >
-      <span>B · incoming</span>
+      <span>B</span>
       {Math.abs(inBright) > 0.001 && (
         <div
           style={{
@@ -391,7 +388,7 @@ export default function DashboardClient({ initialCatalog }: Props) {
                   <div style={styles.layerHead}>
                     <strong>{layer.property}</strong>
                     <span style={styles.muted}>
-                      → {layer.target ?? "outgoing"}
+                      → {layer.target ?? "A"}
                       {layer.mode ? ` · mode ${layer.mode}` : ""}
                       {layer.param ? ` · param ${layer.param}` : ""}
                     </span>
