@@ -570,7 +570,7 @@ const BASIC: TransitionItemDto[] = [
       },
       {
         property: "scale",
-        from: 0.4,
+        from: 0,
         to: 1,
         easing: "easeOut",
         target: "incoming",
@@ -894,7 +894,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 26,
+  version: 27,
   baseUrl: "",
   categories: [
     {
