@@ -93,7 +93,7 @@ function applyProperty(
       return {
         ...pose,
         wipe: Math.min(1, Math.max(0, value)),
-        wipeEdge: (layer.mode ?? pose.wipeEdge || "left").toLowerCase(),
+        wipeEdge: (layer.mode ?? pose.wipeEdge ?? "left").toLowerCase(),
       };
     default:
       return pose;
