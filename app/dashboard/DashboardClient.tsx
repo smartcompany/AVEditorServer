@@ -8,6 +8,7 @@ import type {
 } from "@/lib/transitions";
 import {
   evaluateTransitionLayers,
+  outgoingShouldPaintOnTop,
   poseToCss,
 } from "@/lib/transition-layer-runtime";
 
@@ -178,6 +179,58 @@ export default function DashboardClient({ initialCatalog }: Props) {
   const inCss = poseToCss(evaluation.incoming);
   const outBright = evaluation.outgoing.brightness;
   const inBright = evaluation.incoming.brightness;
+  // Match Flutter: spin-out paints A over static B; spin-in paints B over A.
+  const aOnTop = outgoingShouldPaintOnTop(
+    evaluation,
+    selected.layers ?? [],
+  );
+
+  const clipA = (
+    <div
+      style={{
+        ...styles.clip,
+        ...styles.clipA,
+        ...outCss,
+        zIndex: aOnTop ? 2 : 1,
+      }}
+    >
+      <span>A · outgoing</span>
+      {Math.abs(outBright) > 0.001 && (
+        <div
+          style={{
+            ...styles.veil,
+            background:
+              outBright >= 0
+                ? `rgba(255,255,255,${Math.min(1, Math.abs(outBright))})`
+                : `rgba(0,0,0,${Math.min(1, Math.abs(outBright))})`,
+          }}
+        />
+      )}
+    </div>
+  );
+  const clipB = (
+    <div
+      style={{
+        ...styles.clip,
+        ...styles.clipB,
+        ...inCss,
+        zIndex: aOnTop ? 1 : 2,
+      }}
+    >
+      <span>B · incoming</span>
+      {Math.abs(inBright) > 0.001 && (
+        <div
+          style={{
+            ...styles.veil,
+            background:
+              inBright >= 0
+                ? `rgba(255,255,255,${Math.min(1, Math.abs(inBright))})`
+                : `rgba(0,0,0,${Math.min(1, Math.abs(inBright))})`,
+          }}
+        />
+      )}
+    </div>
+  );
 
   return (
     <div style={styles.page}>
@@ -242,34 +295,17 @@ export default function DashboardClient({ initialCatalog }: Props) {
         <section style={styles.main}>
           <div style={styles.previewShell}>
             <div style={styles.previewStage}>
-              <div style={{ ...styles.clip, ...styles.clipA, ...outCss }}>
-                <span>A · outgoing</span>
-                {Math.abs(outBright) > 0.001 && (
-                  <div
-                    style={{
-                      ...styles.veil,
-                      background:
-                        outBright >= 0
-                          ? `rgba(255,255,255,${Math.min(1, Math.abs(outBright))})`
-                          : `rgba(0,0,0,${Math.min(1, Math.abs(outBright))})`,
-                    }}
-                  />
-                )}
-              </div>
-              <div style={{ ...styles.clip, ...styles.clipB, ...inCss }}>
-                <span>B · incoming</span>
-                {Math.abs(inBright) > 0.001 && (
-                  <div
-                    style={{
-                      ...styles.veil,
-                      background:
-                        inBright >= 0
-                          ? `rgba(255,255,255,${Math.min(1, Math.abs(inBright))})`
-                          : `rgba(0,0,0,${Math.min(1, Math.abs(inBright))})`,
-                    }}
-                  />
-                )}
-              </div>
+              {aOnTop ? (
+                <>
+                  {clipB}
+                  {clipA}
+                </>
+              ) : (
+                <>
+                  {clipA}
+                  {clipB}
+                </>
+              )}
             </div>
 
             <div style={styles.transport}>

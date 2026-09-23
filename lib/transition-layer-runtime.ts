@@ -159,6 +159,55 @@ export function evaluateTransitionLayers(
   return { outgoing, incoming };
 }
 
+function isActivelyTransformed(pose: LayerPose): boolean {
+  return (
+    Math.abs(pose.rotation) > 0.001 ||
+    Math.abs(pose.scale - 1) > 0.01 ||
+    Math.abs(pose.translateX) > 0.01 ||
+    Math.abs(pose.translateY) > 0.01
+  );
+}
+
+function layerIsSpatial(layer: TransitionLayerDto): boolean {
+  return (
+    layer.property === "rotation" ||
+    layer.property === "scale" ||
+    layer.property === "translateX" ||
+    layer.property === "translateY"
+  );
+}
+
+function targetHasSpatialLayers(
+  layers: TransitionLayerDto[],
+  target: "outgoing" | "incoming",
+): boolean {
+  return layers.some((layer) => {
+    if (!layerIsSpatial(layer)) return false;
+    const t = layer.target ?? "outgoing";
+    return t === target || t === "both";
+  });
+}
+
+/**
+ * Spin-out style: A transforms over a static full-frame B → paint A on top.
+ * Mirrors Flutter `outgoingShouldPaintOnTop`.
+ */
+export function outgoingShouldPaintOnTop(
+  evalResult: LayerEvaluation,
+  layers: TransitionLayerDto[] = [],
+): boolean {
+  if (layers.length > 0) {
+    return (
+      targetHasSpatialLayers(layers, "outgoing") &&
+      !targetHasSpatialLayers(layers, "incoming")
+    );
+  }
+  return (
+    isActivelyTransformed(evalResult.outgoing) &&
+    !isActivelyTransformed(evalResult.incoming)
+  );
+}
+
 export function poseToCss(pose: LayerPose): CSSProperties {
   const blur =
     pose.blurMode === "zoom"
