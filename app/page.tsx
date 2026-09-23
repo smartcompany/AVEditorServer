@@ -1,4 +1,5 @@
 const endpoints = [
+  { path: "/dashboard", desc: "Transition preview + edit (Storage-backed)" },
   { path: "/api/health", desc: "Health check" },
   { path: "/catalog.json", desc: "Word Art pack catalog (Flutter base URL + catalog.json)" },
   { path: "/text_packs/catalog.json", desc: "Same catalog (alias)" },

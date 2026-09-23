@@ -1,6 +1,9 @@
-import { buildTransitionCatalog, corsHeaders } from "@/lib/transitions";
+import { corsHeaders } from "@/lib/transitions";
+import { getTransitionCatalog } from "@/lib/transition-catalog-store";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export function OPTIONS() {
   return new Response(null, {
@@ -14,7 +17,7 @@ type Params = { params: Promise<{ id: string }> };
 /** GET /api/transitions/:id */
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  const catalog = buildTransitionCatalog();
+  const catalog = await getTransitionCatalog();
   const item = catalog.items.find((entry) => entry.id === id);
   if (!item) {
     return Response.json(
@@ -25,7 +28,7 @@ export async function GET(_request: Request, { params }: Params) {
   return Response.json(item, {
     headers: {
       ...corsHeaders(),
-      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+      "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
     },
   });
 }

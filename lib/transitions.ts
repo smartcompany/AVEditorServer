@@ -960,4 +960,14 @@ export function buildTransitionCatalog(): TransitionCatalogDto {
   return TRANSITION_CATALOG;
 }
 
+/** CORS for catalog GET + dashboard PUT. */
+export function catalogCorsHeaders(): HeadersInit {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, x-dashboard-secret",
+  };
+}
+
 export { corsHeaders };
