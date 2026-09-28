@@ -15,6 +15,8 @@ export type TransitionLayerDto = {
     | "translateX"
     | "translateY"
     | "rotation"
+    /** Turns around the vertical axis. 0.5 = half turn; the back face is the other clip. */
+    | "rotationY"
     | "blur"
     | "brightness"
     | "saturation"
@@ -41,6 +43,26 @@ export type TransitionLayerDto = {
    * - `wipe`: edge erased first — `"left"` | `"right"` | `"top"` | `"bottom"`.
    */
   mode?: string;
+  /**
+   * When set, this layer is evaluated per cell instead of on the whole frame.
+   * The first gridded layer defines columns, rows, and gap. Each layer's
+   * `stagger` shifts only that property.
+   */
+  grid?: TransitionGridDto;
+};
+
+export type TransitionGridDto = {
+  /** 1…8. */
+  columns?: number;
+  /** 1…8. */
+  rows?: number;
+  /** Inset of each cell as a fraction of the cell size. 0 = no gutter. */
+  gap?: number;
+  /**
+   * 0…0.95. Fraction of the timeline used to spread cell start times.
+   * 0 = every cell uses the same `t`.
+   */
+  stagger?: number;
 };
 
 export type TransitionParameterDto = {
@@ -725,42 +747,17 @@ const BASIC: TransitionItemDto[] = [
   xfade("mosaic", TITLES.mosaic, "#F97316", "pixelize", {
     category: "basic",
     renderer: "primitive",
+    // A flips per cell; the back face is B. Grid numbers stay in the catalog.
     layers: [
       {
-        property: "blur",
+        property: "rotationY",
         from: 0,
-        to: 8,
+        to: 0.5,
+        easing: "easeInOut",
         target: "A",
-        end: 0.5,
-        param: "intensity",
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "A",
-        start: 0.35,
-        end: 0.65,
-      },
-      {
-        property: "blur",
-        from: 8,
-        to: 0,
-        target: "B",
-        start: 0.5,
-        param: "intensity",
-      },
-      {
-        property: "opacity",
-        from: 0,
-        to: 1,
-        target: "B",
-        start: 0.35,
-        end: 0.65,
+        grid: { columns: 4, rows: 4, gap: 0.055, stagger: 0.58 },
       },
     ],
-    parameters: intensityParam,
-    controls: [intensityControl],
   }),
   xfade("wipeleft", TITLES.wipeleft, "#34D399", "wipeleft", {
     category: "basic",
@@ -1009,7 +1006,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 37,
+  version: 39,
   baseUrl: "",
   categories: [
     {

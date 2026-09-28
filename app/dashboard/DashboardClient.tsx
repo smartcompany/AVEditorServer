@@ -9,7 +9,11 @@ import type {
 import {
   evaluateTransitionLayers,
   aShouldPaintOnTop,
+  evaluateGridCell,
+  gridLayout,
+  layerUsesCellPaint,
   poseToCss,
+  rotationYFace,
 } from "@/lib/transition-layer-runtime";
 
 const SECRET_KEY = "aveditor_dashboard_secret";
@@ -28,6 +32,80 @@ function defaultParams(item: TransitionItemDto): Record<string, number> {
 
 function itemTitle(item: TransitionItemDto): string {
   return item.titles?.ko || item.titles?.en || item.title || item.id;
+}
+
+function GridStage({
+  t,
+  layers,
+  parameters,
+}: {
+  t: number;
+  layers: TransitionLayerDto[];
+  parameters: Record<string, number>;
+}) {
+  const layout = gridLayout(layers);
+  const { columns, rows, gap } = layout;
+  const cellLayers = layers.some((layer) => layer.grid)
+    ? layers.filter((layer) => layer.grid)
+    : layers.filter((layer) => layer.property === "rotationY");
+  let flipFront: "A" | "B" = "A";
+  let hasFlip = false;
+  for (const layer of cellLayers) {
+    if (layer.property !== "rotationY") continue;
+    hasFlip = true;
+    const target = layer.target ?? "A";
+    if (target === "A" || target === "B") flipFront = target;
+  }
+  const tiles = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      const index = row * columns + col;
+      const evaluation = evaluateGridCell(layers, t, index, parameters);
+      const turns =
+        flipFront === "B" ? evaluation.b.rotationY : evaluation.a.rotationY;
+      const face = rotationYFace(turns);
+      const showB = hasFlip
+        ? flipFront === "B"
+          ? !face.showBack
+          : face.showBack
+        : aShouldPaintOnTop(evaluation, layers)
+          ? false
+          : true;
+      const pose = showB ? evaluation.b : evaluation.a;
+      const label = showB ? "B" : "A";
+      const faceDeg = hasFlip ? (face.faceRadians * 180) / Math.PI : 0;
+      tiles.push(
+        <div
+          key={index}
+          style={{
+            position: "absolute",
+            left: `calc(${(col / columns) * 100}% + ${gap * 8}%)`,
+            top: `calc(${(row / rows) * 100}% + ${gap * 8}%)`,
+            width: `calc(${100 / columns}% - ${gap * 16}%)`,
+            height: `calc(${100 / rows}% - ${gap * 16}%)`,
+            transform: `perspective(520px) rotateY(${faceDeg}deg) rotate(${pose.rotation * 360}deg) scale(${pose.scale})`,
+            opacity: pose.opacity,
+            background:
+              label === "B"
+                ? "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #ea580c 100%)"
+                : "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #0369a1 100%)",
+            display: "grid",
+            placeItems: "center",
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#fff",
+          }}
+        >
+          {label}
+        </div>,
+      );
+    }
+  }
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#000" }}>
+      {tiles}
+    </div>
+  );
 }
 
 export default function DashboardClient({ initialCatalog }: Props) {
@@ -181,6 +259,7 @@ export default function DashboardClient({ initialCatalog }: Props) {
   const inBright = evaluation.b.brightness;
   // Match Flutter: spin-out paints A over static B; spin-in paints B over A.
   const aOnTop = aShouldPaintOnTop(evaluation, selected.layers ?? []);
+  const cellPaint = layerUsesCellPaint(selected.layers ?? []);
 
   const clipA = (
     <div
@@ -292,7 +371,13 @@ export default function DashboardClient({ initialCatalog }: Props) {
         <section style={styles.main}>
           <div style={styles.previewShell}>
             <div style={styles.previewStage}>
-              {aOnTop ? (
+              {cellPaint ? (
+                <GridStage
+                  t={progress}
+                  layers={selected.layers ?? []}
+                  parameters={params}
+                />
+              ) : aOnTop ? (
                 <>
                   {clipB}
                   {clipA}

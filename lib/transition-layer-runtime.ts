@@ -7,6 +7,8 @@ export type LayerPose = {
   translateX: number;
   translateY: number;
   rotation: number;
+  /** Turns around Y. The back face is the other clip. */
+  rotationY: number;
   blur: number;
   brightness: number;
   blurMode: string;
@@ -27,6 +29,7 @@ const identityPose = (): LayerPose => ({
   translateX: 0,
   translateY: 0,
   rotation: 0,
+  rotationY: 0,
   blur: 0,
   brightness: 0,
   blurMode: "",
@@ -81,6 +84,8 @@ function applyProperty(
       return { ...pose, translateY: value };
     case "rotation":
       return { ...pose, rotation: value };
+    case "rotationY":
+      return { ...pose, rotationY: value };
     case "blur":
       return {
         ...pose,
@@ -107,14 +112,18 @@ export function evaluateTransitionLayers(
   parameters: Record<string, number> = {},
 ): LayerEvaluation {
   const progress = Math.min(1, Math.max(0, t));
+  const frameLayers = layers.filter((layer) => !layer.grid);
+  if (frameLayers.length === 0 && layers.some((layer) => layer.grid)) {
+    return { a: identityPose(), b: identityPose() };
+  }
   let a = identityPose();
   let b = { ...identityPose(), opacity: 0 };
 
-  const hasOpacity = layers.some((l) => l.property === "opacity");
+  const hasOpacity = frameLayers.some((l) => l.property === "opacity");
   let aOpacitySet = false;
   let bOpacitySet = false;
 
-  for (const layer of layers) {
+  for (const layer of frameLayers) {
     const windowStart = Math.min(1, Math.max(0, layer.start ?? 0));
     if (progress < windowStart) continue;
 
@@ -143,11 +152,12 @@ export function evaluateTransitionLayers(
   }
 
   if (!hasOpacity) {
-    const solid = layers.some(
+    const solid = frameLayers.some(
       (l) =>
         l.property === "translateX" ||
         l.property === "translateY" ||
         l.property === "rotation" ||
+        l.property === "rotationY" ||
         l.property === "wipe",
     );
     if (solid) {
@@ -172,9 +182,118 @@ export function evaluateTransitionLayers(
   return { a, b };
 }
 
+function layerValue(
+  layer: TransitionLayerDto,
+  t: number,
+  parameters: Record<string, number>,
+): number | null {
+  const progress = Math.min(1, Math.max(0, t));
+  const start = Math.min(1, Math.max(0, layer.start ?? 0));
+  if (progress < start) return null;
+  const endRaw = layer.end ?? 1;
+  const end = endRaw < start ? start : Math.min(1, Math.max(0, endRaw));
+  const from = resolveEndpoint(layer.from, layer, parameters);
+  const to = resolveEndpoint(layer.to, layer, parameters);
+  if (progress <= start) return from;
+  if (progress >= end || end <= start) return to;
+  const local = (progress - start) / (end - start);
+  return from + (to - from) * ease(layer.easing, local);
+}
+
+function applyLayerOnto(
+  evaluation: LayerEvaluation,
+  layer: TransitionLayerDto,
+  t: number,
+  parameters: Record<string, number>,
+): LayerEvaluation {
+  const value = layerValue(layer, t, parameters);
+  if (value == null) return evaluation;
+  const target = layer.target ?? "A";
+  return {
+    a:
+      target === "A" || target === "both"
+        ? applyProperty(evaluation.a, layer, value)
+        : evaluation.a,
+    b:
+      target === "B" || target === "both"
+        ? applyProperty(evaluation.b, layer, value)
+        : evaluation.b,
+  };
+}
+
+/** 0…0.95. Share of the timeline used to spread cell start times. */
+export function gridCellProgress(
+  index: number,
+  t: number,
+  stagger: number,
+): number {
+  const progress = Math.min(1, Math.max(0, t));
+  const spread = Math.min(0.95, Math.max(0, stagger));
+  if (spread <= 0.0001) return progress;
+  const phase = (index * 0.618033988749895) % 1;
+  const start = phase * spread;
+  return Math.min(1, Math.max(0, (progress - start) / (1 - spread)));
+}
+
+/** Past a quarter turn the other clip faces the camera. */
+export function rotationYFace(turns: number): {
+  showBack: boolean;
+  faceRadians: number;
+} {
+  const angle = turns * Math.PI * 2;
+  const showBack = Math.cos(angle) < 0;
+  const face = showBack ? (angle > 0 ? angle - Math.PI : angle + Math.PI) : angle;
+  return { showBack, faceRadians: face };
+}
+
+export function layerUsesCellPaint(layers: TransitionLayerDto[]): boolean {
+  return layers.some((layer) => layer.grid || layer.property === "rotationY");
+}
+
+/** One cell of a gridded (or whole-frame rotationY) transition. */
+export function evaluateGridCell(
+  layers: TransitionLayerDto[],
+  t: number,
+  index: number,
+  parameters: Record<string, number> = {},
+): LayerEvaluation {
+  const gridLayers = layers.filter((layer) => layer.grid);
+  const cellLayers = gridLayers.length
+    ? gridLayers
+    : layers.filter((layer) => layer.property === "rotationY");
+  const baseLayers = layers.filter((layer) => !cellLayers.includes(layer));
+  let evaluation = baseLayers.length
+    ? evaluateTransitionLayers(baseLayers, t, parameters)
+    : { a: identityPose(), b: identityPose() };
+  for (const layer of cellLayers) {
+    const cellT = gridCellProgress(index, t, layer.grid?.stagger ?? 0);
+    evaluation = applyLayerOnto(evaluation, layer, cellT, parameters);
+  }
+  return evaluation;
+}
+
+export function gridLayout(layers: TransitionLayerDto[]): {
+  columns: number;
+  rows: number;
+  gap: number;
+} {
+  const grid = layers.find((layer) => layer.grid)?.grid;
+  const axis = (raw: number | undefined, fallback: number) => {
+    const n = raw == null ? fallback : Math.round(raw);
+    return Math.min(8, Math.max(1, n));
+  };
+  if (!grid) return { columns: 1, rows: 1, gap: 0 };
+  return {
+    columns: axis(grid.columns, 4),
+    rows: axis(grid.rows, 4),
+    gap: Math.min(0.4, Math.max(0, grid.gap ?? 0)),
+  };
+}
+
 function isActivelyTransformed(pose: LayerPose): boolean {
   return (
     Math.abs(pose.rotation) > 0.001 ||
+    Math.abs(pose.rotationY) > 0.001 ||
     Math.abs(pose.scale - 1) > 0.01 ||
     Math.abs(pose.translateX) > 0.01 ||
     Math.abs(pose.translateY) > 0.01 ||
@@ -235,6 +354,7 @@ export function poseToCss(pose: LayerPose): CSSProperties {
     transform: [
       `translate(${pose.translateX * 100}%, ${pose.translateY * 100}%)`,
       `rotate(${pose.rotation * 360}deg)`,
+      `rotateY(${pose.rotationY * 360}deg)`,
       `scale(${pose.scale * zoomExtra})`,
     ].join(" "),
     filter: blur > 0.3 ? `blur(${blur}px)` : undefined,
