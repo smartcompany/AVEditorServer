@@ -17,6 +17,11 @@ export type TransitionLayerDto = {
     | "rotation"
     /** Turns around the vertical axis. 0.5 = half turn; the back face is the other clip. */
     | "rotationY"
+    /**
+     * Concentric wave progress. 0 = A untouched, 1 = wave has passed and B
+     * fills the frame. `parameters.intensity` scales the ring bulge only.
+     */
+    | "ripple"
     | "blur"
     | "brightness"
     | "saturation"
@@ -952,52 +957,14 @@ const BASIC: TransitionItemDto[] = [
   xfade("ripple", TITLES.ripple, "#06B6D4", "hblur", {
     category: "basic",
     renderer: "primitive",
+    // Wave progress is the layer value. Intensity only scales the bulge.
     layers: [
       {
-        property: "blur",
-        from: 0,
-        to: 10,
-        target: "A",
-        end: 0.5,
-        param: "intensity",
-      },
-      {
-        property: "scale",
-        from: 1,
-        to: 1.08,
-        target: "A",
-        end: 0.5,
-      },
-      {
-        property: "opacity",
-        from: 1,
-        to: 0,
-        target: "A",
-        start: 0.3,
-        end: 0.65,
-      },
-      {
-        property: "blur",
-        from: 10,
-        to: 0,
-        target: "B",
-        start: 0.45,
-        param: "intensity",
-      },
-      {
-        property: "scale",
-        from: 1.08,
-        to: 1,
-        target: "B",
-        start: 0.45,
-      },
-      {
-        property: "opacity",
+        property: "ripple",
         from: 0,
         to: 1,
-        target: "B",
-        start: 0.3,
-        end: 0.65,
+        easing: "easeInOut",
+        target: "both",
       },
     ],
     parameters: intensityParam,
@@ -1006,7 +973,7 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 39,
+  version: 40,
   baseUrl: "",
   categories: [
     {

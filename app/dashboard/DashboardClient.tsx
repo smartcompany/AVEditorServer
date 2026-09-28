@@ -108,6 +108,56 @@ function GridStage({
   );
 }
 
+function RippleStage({ wave }: { wave: number }) {
+  const t = Math.min(1, Math.max(0, wave));
+  const bulge = Math.sin(t * Math.PI) * 0.16;
+  const rings = [0.15, 0.32, 0.5, 0.7, 0.9].map((band, index) => {
+    const radius = Math.max(0, (t * 1.15 - 0.15 + band * 0.35) * 70);
+    const scale = 1 + Math.sin(band * Math.PI) * bulge;
+    const showB = band < 0.55 && radius > 8;
+    return (
+      <div
+        key={index}
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          width: `${radius * 2}%`,
+          height: `${radius * 2}%`,
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          borderRadius: "50%",
+          background: showB
+            ? "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #ea580c 100%)"
+            : "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #0369a1 100%)",
+          display: "grid",
+          placeItems: "center",
+          fontWeight: 700,
+          color: "#fff",
+          clipPath: "circle(50% at 50% 50%)",
+        }}
+      >
+        {radius > 18 ? (showB ? "B" : "A") : ""}
+      </div>
+    );
+  });
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#1d4ed8", overflow: "hidden" }}>
+      <div style={{ ...stylesClipA }}>A</div>
+      {rings}
+    </div>
+  );
+}
+
+const stylesClipA: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "grid",
+  placeItems: "center",
+  fontWeight: 700,
+  color: "#fff",
+  background: "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #0369a1 100%)",
+};
+
 export default function DashboardClient({ initialCatalog }: Props) {
   const [catalog, setCatalog] = useState(initialCatalog);
   const [selectedId, setSelectedId] = useState(
@@ -260,6 +310,10 @@ export default function DashboardClient({ initialCatalog }: Props) {
   // Match Flutter: spin-out paints A over static B; spin-in paints B over A.
   const aOnTop = aShouldPaintOnTop(evaluation, selected.layers ?? []);
   const cellPaint = layerUsesCellPaint(selected.layers ?? []);
+  const rippleWave = Math.max(evaluation.a.ripple, evaluation.b.ripple);
+  const ripplePaint = (selected.layers ?? []).some(
+    (layer) => layer.property === "ripple",
+  );
 
   const clipA = (
     <div
@@ -371,7 +425,9 @@ export default function DashboardClient({ initialCatalog }: Props) {
         <section style={styles.main}>
           <div style={styles.previewShell}>
             <div style={styles.previewStage}>
-              {cellPaint ? (
+              {ripplePaint ? (
+                <RippleStage wave={rippleWave} />
+              ) : cellPaint ? (
                 <GridStage
                   t={progress}
                   layers={selected.layers ?? []}

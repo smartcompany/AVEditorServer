@@ -9,6 +9,8 @@ export type LayerPose = {
   rotation: number;
   /** Turns around Y. The back face is the other clip. */
   rotationY: number;
+  /** Concentric wave progress. 0 = A, 1 = B. */
+  ripple: number;
   blur: number;
   brightness: number;
   blurMode: string;
@@ -30,6 +32,7 @@ const identityPose = (): LayerPose => ({
   translateY: 0,
   rotation: 0,
   rotationY: 0,
+  ripple: 0,
   blur: 0,
   brightness: 0,
   blurMode: "",
@@ -86,6 +89,8 @@ function applyProperty(
       return { ...pose, rotation: value };
     case "rotationY":
       return { ...pose, rotationY: value };
+    case "ripple":
+      return { ...pose, ripple: Math.min(1, Math.max(0, value)) };
     case "blur":
       return {
         ...pose,
@@ -158,6 +163,7 @@ export function evaluateTransitionLayers(
         l.property === "translateY" ||
         l.property === "rotation" ||
         l.property === "rotationY" ||
+        l.property === "ripple" ||
         l.property === "wipe",
     );
     if (solid) {
