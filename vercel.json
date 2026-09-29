@@ -11,6 +11,10 @@
     {
       "source": "/api/text-packs/catalog.json",
       "destination": "/api/text-packs/catalog"
+    },
+    {
+      "source": "/share/catalog.json",
+      "destination": "/api/share/catalog"
     }
   ]
 }
