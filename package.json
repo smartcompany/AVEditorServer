@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "export:transitions": "npx --yes tsx scripts/export-transition-catalog.ts",
-    "seed:transitions": "npx --yes tsx scripts/seed-transition-catalog.ts"
+    "seed:transitions": "npx --yes tsx scripts/seed-transition-catalog.ts",
+    "export:text-packs": "npx --yes tsx scripts/export-text-pack-catalog.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
