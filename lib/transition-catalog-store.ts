@@ -88,6 +88,10 @@ export async function getTransitionCatalog(): Promise<TransitionCatalogDto> {
       console.warn("[transitions] Invalid Storage catalog shape, using seed");
       return normalizeCatalog(buildTransitionCatalog());
     }
+    // Code-side seed changes (e.g. new premium flags) win over an older save.
+    if (parsed.version < buildTransitionCatalog().version) {
+      return normalizeCatalog(buildTransitionCatalog());
+    }
     return normalizeCatalog(parsed);
   } catch (error) {
     console.warn("[transitions] Storage read failed, using seed:", error);
@@ -105,7 +109,11 @@ export async function putTransitionCatalog(
   const normalized = normalizeCatalog(catalog);
   const next: TransitionCatalogDto = {
     ...normalized,
-    version: Math.max(1, Math.floor(normalized.version || 1)),
+    // Always above the seed so clients prefer the saved catalog.
+    version: Math.max(
+      Math.floor(normalized.version || 1),
+      buildTransitionCatalog().version + 1,
+    ),
   };
 
   const body = `${JSON.stringify(next, null, 2)}\n`;

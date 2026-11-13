@@ -1,3 +1,4 @@
+import { authorizeDashboard } from "@/lib/dashboard-auth";
 import { catalogCorsHeaders } from "@/lib/transitions";
 import {
   assertCatalogWritable,
@@ -9,18 +10,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function authorizeWrite(request: Request): boolean {
-  const secret = process.env.DASHBOARD_SECRET?.trim();
-  if (!secret) {
-    // Local/dev convenience only — never allow open writes in production.
-    return process.env.NODE_ENV !== "production";
-  }
-  const header = request.headers.get("x-dashboard-secret")?.trim();
-  if (header && header === secret) return true;
-  const url = new URL(request.url);
-  const query = url.searchParams.get("secret")?.trim();
-  return Boolean(query && query === secret);
-}
 
 export function OPTIONS() {
   return new Response(null, {
@@ -42,7 +31,7 @@ export async function GET() {
 
 /** PUT — dashboard save to Supabase Storage (no redeploy). */
 export async function PUT(request: Request) {
-  if (!authorizeWrite(request)) {
+  if (!authorizeDashboard(request)) {
     return Response.json(
       { error: "unauthorized" },
       { status: 401, headers: catalogCorsHeaders() },
