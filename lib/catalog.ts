@@ -329,6 +329,29 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
  * - effects: static CapCut-style looks
  * - templates: look + entrance animation (Journal / Neon / Sticker)
  */
+/**
+ * Pro-only text looks. The original six and the everyday styles stay free;
+ * the flashier neon / metallic / glow looks are Pro.
+ */
+export const PREMIUM_PACK_ITEM_IDS = new Set<string>([
+  "effect_neon_pink",
+  "effect_neon_blue",
+  "effect_gold",
+  "effect_fire",
+  "effect_ice",
+  "effect_glow",
+  "effect_color_pop",
+  "effect_candy",
+  "pack_neon_pink",
+  "pack_cyber",
+  "pack_gold_title",
+  "pack_hot",
+  "pack_frost",
+  "pack_candy",
+  "pack_sunset",
+  "pack_breaking",
+]);
+
 export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
   {
     id: "effects",
@@ -505,10 +528,16 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
   },
 ];
 
+for (const category of PACK_CATEGORIES) {
+  for (const item of category.items) {
+    item.premium = PREMIUM_PACK_ITEM_IDS.has(item.id);
+  }
+}
+
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return {
-    version: 7,
+    version: 8,
     baseUrl: normalized,
     categories: PACK_CATEGORIES,
   };

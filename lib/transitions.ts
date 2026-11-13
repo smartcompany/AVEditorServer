@@ -972,8 +972,29 @@ const BASIC: TransitionItemDto[] = [
   }),
 ];
 
+/**
+ * Pro-only transitions. Free users can preview them in the editor; export
+ * asks for Pro, a rewarded ad, or removing them. Basics stay free.
+ */
+export const PREMIUM_TRANSITION_IDS = new Set<string>([
+  "spinin",
+  "spinout",
+  "doorway",
+  "cube",
+  "mosaic",
+  "puzzleleft",
+  "puzzleright",
+  "crosszoom",
+  "ripple",
+  "swap",
+]);
+
+for (const item of BASIC) {
+  item.premium = PREMIUM_TRANSITION_IDS.has(item.id);
+}
+
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 40,
+  version: 41,
   baseUrl: "",
   categories: [
     {

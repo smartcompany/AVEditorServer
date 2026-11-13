@@ -11,6 +11,7 @@ export function GET() {
       share: "/share/catalog.json",
       transitionsList: "/api/transitions",
       health: "/api/health",
+      settings: "/api/settings",
     },
   });
 }

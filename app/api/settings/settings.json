@@ -1,0 +1,18 @@
+{
+  "photo_add_ad_every": 5,
+  "ios_ads": [{ "initial_test": 1 }],
+  "android_ads": [{ "initial_test": 1 }],
+  "down_load_url": "https://use-by-date-server.vercel.app/applink",
+  "ref": {
+    "ios": {
+      "initial_test": "ca-app-pub-3940256099942544/4411468910",
+      "initial_ad": "ca-app-pub-5520596727761259/4307155404",
+      "reward_ad": "ca-app-pub-5520596727761259/4902051774"
+    },
+    "android": {
+      "initial_test": "ca-app-pub-3940256099942544/1033173712",
+      "initial_ad": "ca-app-pub-5520596727761259/5681101773",
+      "reward_ad": "ca-app-pub-5520596727761259/8075010029"
+    }
+  }
+}
