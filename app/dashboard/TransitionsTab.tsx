@@ -14,6 +14,10 @@ import {
   layerUsesCellPaint,
   poseToCss,
   rotationYFace,
+  resolveNamedPreview,
+  circleClipRadiusPct,
+  easeInOutCubic,
+  easeOutCubic,
 } from "@/lib/transition-layer-runtime";
 
 type Props = {
@@ -147,6 +151,151 @@ function RippleStage({ wave }: { wave: number }) {
   );
 }
 
+/** Circle open: B grows from center. Circle close: A shrinks away over B. */
+function CircleStage({ t, open }: { t: number; open: boolean }) {
+  const progress = Math.min(1, Math.max(0, t));
+  const radius = circleClipRadiusPct(open ? progress : 1 - progress);
+  const clipped = open ? (
+    <div
+      style={{
+        ...stylesClipB,
+        clipPath: `circle(${radius}% at 50% 50%)`,
+      }}
+    >
+      B
+    </div>
+  ) : (
+    <div
+      style={{
+        ...stylesClipA,
+        clipPath: `circle(${radius}% at 50% 50%)`,
+        zIndex: 2,
+      }}
+    >
+      A
+    </div>
+  );
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      {open ? (
+        <>
+          <div style={stylesClipA}>A</div>
+          {clipped}
+        </>
+      ) : (
+        <>
+          <div style={stylesClipB}>B</div>
+          {clipped}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A splits L/R from center; B scales up through the opening. */
+function DoorwayStage({
+  t,
+  incomingScaleFrom,
+  incomingScaleTo,
+}: {
+  t: number;
+  incomingScaleFrom: number;
+  incomingScaleTo: number;
+}) {
+  const u = easeInOutCubic(t);
+  const doorPct = 50 * (1 - u);
+  const bScale =
+    incomingScaleFrom +
+    (incomingScaleTo - incomingScaleFrom) * easeOutCubic(u);
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <div
+        style={{
+          ...stylesClipB,
+          transform: `scale(${bScale})`,
+        }}
+      >
+        B
+      </div>
+      {doorPct > 0.05 && (
+        <>
+          <div
+            style={{
+              ...stylesClipA,
+              clipPath: `inset(0 ${100 - doorPct}% 0 0)`,
+              zIndex: 2,
+            }}
+          >
+            A
+          </div>
+          <div
+            style={{
+              ...stylesClipA,
+              clipPath: `inset(0 0 0 ${100 - doorPct}%)`,
+              zIndex: 2,
+            }}
+          >
+            A
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Three vertical B strips enter in sequence (puzzle left / right). */
+function PuzzleStage({ t, reverse }: { t: number; reverse: boolean }) {
+  const progress = Math.min(1, Math.max(0, t));
+  const columns = reverse ? [0, 1, 2] : [2, 1, 0];
+  const strips = columns.map((col, phase) => {
+    const local = Math.min(1, Math.max(0, (progress - phase / 3) * 3));
+    if (local <= 0) return null;
+    const eased = easeOutCubic(local);
+    const sign = reverse ? 1 : -1;
+    const dx = col === 1 ? 0 : sign * (1 - eased) * 100;
+    const dy = col === 1 ? sign * (1 - eased) * 100 : 0;
+    return (
+      <div
+        key={col}
+        style={{
+          position: "absolute",
+          left: `${(col / 3) * 100}%`,
+          top: 0,
+          width: `${100 / 3}%`,
+          height: "100%",
+          overflow: "hidden",
+          zIndex: 2,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: `${-col * 100}%`,
+            width: "300%",
+            display: "grid",
+            placeItems: "center",
+            fontWeight: 700,
+            color: "#fff",
+            background:
+              "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #ea580c 100%)",
+            transform: `translate(${dx}%, ${dy}%)`,
+          }}
+        >
+          B
+        </div>
+      </div>
+    );
+  });
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <div style={stylesClipA}>A</div>
+      {strips}
+    </div>
+  );
+}
+
 const stylesClipA: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -155,6 +304,16 @@ const stylesClipA: CSSProperties = {
   fontWeight: 700,
   color: "#fff",
   background: "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #0369a1 100%)",
+};
+
+const stylesClipB: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "grid",
+  placeItems: "center",
+  fontWeight: 700,
+  color: "#fff",
+  background: "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #ea580c 100%)",
 };
 
 export default function TransitionsTab({ initialCatalog, secret }: Props) {
@@ -390,6 +549,7 @@ export default function TransitionsTab({ initialCatalog, secret }: Props) {
   const ripplePaint = (selected.layers ?? []).some(
     (layer) => layer.property === "ripple",
   );
+  const namedPreview = resolveNamedPreview(selected);
 
   const clipA = (
     <div
@@ -504,6 +664,20 @@ export default function TransitionsTab({ initialCatalog, secret }: Props) {
                   layers={selected.layers ?? []}
                   parameters={params}
                 />
+              ) : namedPreview?.kind === "circleopen" ||
+                namedPreview?.kind === "circleclose" ? (
+                <CircleStage
+                  t={progress}
+                  open={namedPreview.kind === "circleopen"}
+                />
+              ) : namedPreview?.kind === "doorway" ? (
+                <DoorwayStage
+                  t={progress}
+                  incomingScaleFrom={namedPreview.incomingScaleFrom}
+                  incomingScaleTo={namedPreview.incomingScaleTo}
+                />
+              ) : namedPreview?.kind === "puzzle" ? (
+                <PuzzleStage t={progress} reverse={namedPreview.reverse} />
               ) : aOnTop ? (
                 <>
                   {clipB}

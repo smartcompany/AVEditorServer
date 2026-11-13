@@ -367,3 +367,85 @@ export function poseToCss(pose: LayerPose): CSSProperties {
     clipPath: wipeClipPath(pose.wipe, pose.wipeEdge),
   };
 }
+
+/** Matches Flutter Curves.easeInOutCubic. */
+export function easeInOutCubic(t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+}
+
+/** Matches Flutter Curves.easeOutCubic. */
+export function easeOutCubic(t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return 1 - Math.pow(1 - u, 3);
+}
+
+/**
+ * CSS circle() % radius covers corners at 70.71% (half-diagonal vs
+ * sqrt(w²+h²)/√2). Matches Flutter iris maxR = half diagonal.
+ */
+export function circleClipRadiusPct(t: number): number {
+  return Math.min(1, Math.max(0, t)) * 70.71;
+}
+
+export type NamedPreview =
+  | {
+      kind: "circleopen" | "circleclose";
+    }
+  | {
+      kind: "doorway";
+      incomingScaleFrom: number;
+      incomingScaleTo: number;
+    }
+  | {
+      kind: "puzzle";
+      reverse: boolean;
+    };
+
+/**
+ * Dashboard preview for effects that are not fully described by layers
+ * (circle xfade names, doorway / puzzle role compositors). Prefer
+ * `effect.kind` / `customId`; fall back to ffmpegName only when layers
+ * are empty so spinin/spinout (ffmpeg circle* + layers) stay layer-driven.
+ */
+export function resolveNamedPreview(item: {
+  id?: string;
+  ffmpegName?: string;
+  customId?: string;
+  effect?: Record<string, unknown> | null;
+  layers?: unknown[] | null;
+}): NamedPreview | null {
+  const effect = item.effect ?? undefined;
+  const effectKind =
+    typeof effect?.kind === "string" ? effect.kind.toLowerCase() : "";
+  const custom = (item.customId ?? "").toLowerCase();
+
+  if (effectKind === "doorway" || custom === "doorway") {
+    const from =
+      typeof effect?.incomingScaleFrom === "number"
+        ? effect.incomingScaleFrom
+        : 0.84;
+    const to =
+      typeof effect?.incomingScaleTo === "number"
+        ? effect.incomingScaleTo
+        : 1;
+    return { kind: "doorway", incomingScaleFrom: from, incomingScaleTo: to };
+  }
+  if (effectKind === "puzzle" || custom === "puzzle") {
+    return { kind: "puzzle", reverse: Boolean(effect?.reverse) };
+  }
+
+  const layers = item.layers ?? [];
+  if (layers.length > 0) return null;
+
+  const token = `${item.id ?? ""} ${item.ffmpegName ?? ""}`.toLowerCase();
+  if (token.includes("circleclose")) return { kind: "circleclose" };
+  if (
+    token.includes("circleopen") ||
+    token.includes("radial") ||
+    /\bcircle\b/.test(token)
+  ) {
+    return { kind: "circleopen" };
+  }
+  return null;
+}
