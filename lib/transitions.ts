@@ -799,21 +799,8 @@ const BASIC: TransitionItemDto[] = [
   xfade("wipeup", TITLES.wipeup, "#5EEAD4", "wipeup", {
     category: "basic",
     renderer: "primitive",
-    layers: [
-      { property: "scale", from: 1, to: 1, target: "B" },
-      {
-        property: "wipe",
-        from: 0,
-        to: 1,
-        easing: "linear",
-        target: "A",
-        mode: "top",
-      },
-    ],
-  }),
-  xfade("wipedown", TITLES.wipedown, "#14B8A6", "wipedown", {
-    category: "basic",
-    renderer: "primitive",
+    // Same convention as left/right: name = edge travel direction.
+    // Wipe up → erase A from the bottom so the edge moves upward.
     layers: [
       { property: "scale", from: 1, to: 1, target: "B" },
       {
@@ -823,6 +810,22 @@ const BASIC: TransitionItemDto[] = [
         easing: "linear",
         target: "A",
         mode: "bottom",
+      },
+    ],
+  }),
+  xfade("wipedown", TITLES.wipedown, "#14B8A6", "wipedown", {
+    category: "basic",
+    renderer: "primitive",
+    // Wipe down → erase A from the top so the edge moves downward.
+    layers: [
+      { property: "scale", from: 1, to: 1, target: "B" },
+      {
+        property: "wipe",
+        from: 0,
+        to: 1,
+        easing: "linear",
+        target: "A",
+        mode: "top",
       },
     ],
   }),
@@ -994,7 +997,7 @@ for (const item of BASIC) {
 }
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 41,
+  version: 42,
   baseUrl: "",
   categories: [
     {

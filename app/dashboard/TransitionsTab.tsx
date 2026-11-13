@@ -16,6 +16,8 @@ import {
   rotationYFace,
   resolveNamedPreview,
   circleClipRadiusPct,
+  rippleField,
+  applyNoDip,
   easeInOutCubic,
   easeOutCubic,
 } from "@/lib/transition-layer-runtime";
@@ -111,43 +113,91 @@ function GridStage({
   );
 }
 
-function RippleStage({ wave }: { wave: number }) {
-  const t = Math.min(1, Math.max(0, wave));
-  const bulge = Math.sin(t * Math.PI) * 0.16;
-  const rings = [0.15, 0.32, 0.5, 0.7, 0.9].map((band, index) => {
-    const radius = Math.max(0, (t * 1.15 - 0.15 + band * 0.35) * 70);
-    const scale = 1 + Math.sin(band * Math.PI) * bulge;
-    const showB = band < 0.55 && radius > 8;
-    return (
-      <div
-        key={index}
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: "50%",
-          width: `${radius * 2}%`,
-          height: `${radius * 2}%`,
-          transform: `translate(-50%, -50%) scale(${scale})`,
-          borderRadius: "50%",
-          background: showB
-            ? "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #ea580c 100%)"
-            : "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #0369a1 100%)",
-          display: "grid",
-          placeItems: "center",
-          fontWeight: 700,
-          color: "#fff",
-          clipPath: "circle(50% at 50% 50%)",
-        }}
-      >
-        {radius > 18 ? (showB ? "B" : "A") : ""}
-      </div>
-    );
-  });
+/** Paints the A / B demo frames (same gradients + letters as the CSS clips). */
+function paintDemoFrame(w: number, h: number, label: "A" | "B"): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  const stops =
+    label === "A" ? ["#1d4ed8", "#0ea5e9", "#0369a1"] : ["#b45309", "#f59e0b", "#ea580c"];
+  g.addColorStop(0, stops[0]);
+  g.addColorStop(0.5, stops[1]);
+  g.addColorStop(1, stops[2]);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // A grid makes the bend visible, like texture in real footage.
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1;
+  const step = Math.max(12, Math.round(Math.min(w, h) / 10));
+  for (let x = step; x < w; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, h);
+    ctx.stroke();
+  }
+  for (let y = step; y < h; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(w, y + 0.5);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#fff";
+  ctx.font = `700 ${Math.round(h * 0.28)}px system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, w / 2, h / 2);
+  return ctx.getImageData(0, 0, w, h);
+}
+
+/**
+ * Ripple preview drawn per pixel with the app's exact ripple field
+ * ([rippleField]): B is revealed inside the growing front while three crests
+ * bend both frames outward.
+ */
+function RippleStage({ wave, intensity }: { wave: number; intensity: number }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const framesRef = useRef<{ w: number; h: number; a: ImageData; b: ImageData } | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    // Half resolution keeps the per-pixel loop cheap during playback.
+    const w = Math.max(64, Math.round(rect.width / 2));
+    const h = Math.max(36, Math.round(rect.height / 2));
+    if (!framesRef.current || framesRef.current.w !== w || framesRef.current.h !== h) {
+      framesRef.current = { w, h, a: paintDemoFrame(w, h, "A"), b: paintDemoFrame(w, h, "B") };
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const { a, b } = framesRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const out = ctx.createImageData(w, h);
+    const t = Math.min(1, Math.max(0, wave));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const f = rippleField(x + 0.5, y + 0.5, w, h, t, intensity);
+        const sx = Math.min(w - 1, Math.max(0, Math.round(x - f.dx)));
+        const sy = Math.min(h - 1, Math.max(0, Math.round(y - f.dy)));
+        const si = (sy * w + sx) * 4;
+        const oi = (y * w + x) * 4;
+        const m = f.mix;
+        out.data[oi] = a.data[si] * (1 - m) + b.data[si] * m;
+        out.data[oi + 1] = a.data[si + 1] * (1 - m) + b.data[si + 1] * m;
+        out.data[oi + 2] = a.data[si + 2] * (1 - m) + b.data[si + 2] * m;
+        out.data[oi + 3] = 255;
+      }
+    }
+    ctx.putImageData(out, 0, 0);
+  }, [wave, intensity]);
+
   return (
-    <div style={{ position: "absolute", inset: 0, background: "#1d4ed8", overflow: "hidden" }}>
-      <div style={{ ...stylesClipA }}>A</div>
-      {rings}
-    </div>
+    <canvas
+      ref={canvasRef}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+    />
   );
 }
 
@@ -372,7 +422,11 @@ export default function TransitionsTab({ initialCatalog, secret }: Props) {
     if (!selected) {
       return evaluateTransitionLayers([], 0);
     }
-    return evaluateTransitionLayers(selected.layers ?? [], progress, params);
+    // Match the app: overlapping cross-fades never dip toward black.
+    return applyNoDip(
+      evaluateTransitionLayers(selected.layers ?? [], progress, params),
+      selected.layers ?? [],
+    );
   }, [selected, progress, params]);
 
   const selectItem = (id: string) => {
@@ -657,7 +711,7 @@ export default function TransitionsTab({ initialCatalog, secret }: Props) {
           <div style={styles.previewShell}>
             <div style={styles.previewStage}>
               {ripplePaint ? (
-                <RippleStage wave={rippleWave} />
+                <RippleStage wave={rippleWave} intensity={params.intensity ?? 0.7} />
               ) : cellPaint ? (
                 <GridStage
                   t={progress}

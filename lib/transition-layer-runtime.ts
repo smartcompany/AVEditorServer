@@ -449,3 +449,88 @@ export function resolveNamedPreview(item: {
   }
   return null;
 }
+
+/**
+ * Ripple field at pixel (x, y) of a w×h frame — identical to the app's
+ * renderers (iOS composeRipple, Android blend shader mode 6):
+ *  - wave front = progress × diagonal × 0.62, ring width = shorter side × 0.16
+ *  - three decaying crests displace pixels radially (bend), strength
+ *    = shorter side × 0.09 × (intensity / 0.7)
+ *  - inside the front the incoming clip shows, with a linear edge from
+ *    front − 0.9·ring to front + 0.2·ring.
+ * Returns the sample offset (sample at x − dx, y − dy) and the B mix.
+ */
+export function rippleField(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  progress: number,
+  intensity = 0.7,
+): { dx: number; dy: number; mix: number } {
+  const p = Math.min(1, Math.max(0, progress));
+  const side = Math.min(w, h);
+  const front = p * Math.hypot(w, h) * 0.62;
+  const ring = side * 0.16;
+  const sigma = Math.max(ring * 0.42, 1);
+  const env = Math.sin(p * Math.PI);
+  const px = x - w / 2;
+  const py = y - h / 2;
+  const r = Math.hypot(px, py);
+  let mag = 0;
+  if (r > 0.5) {
+    for (let k = 0; k < 3; k++) {
+      const crest = front - k * ring * 0.72;
+      const dist = r - crest;
+      const band = Math.exp(-(dist * dist) / (sigma * sigma));
+      const wave = Math.sin((dist / Math.max(ring, 1)) * Math.PI * 2);
+      mag += wave * band * env * (k === 0 ? 1 : 0.45);
+    }
+    mag = Math.min(1, Math.max(-1, mag));
+  }
+  const shift = mag * side * 0.09 * (intensity / 0.7);
+  const dx = r > 0.5 ? (px / r) * shift : 0;
+  const dy = r > 0.5 ? (py / r) * shift : 0;
+  const inner = front - ring * 0.9;
+  const outer = front + ring * 0.2;
+  const mix = Math.min(1, Math.max(0, (outer - r) / Math.max(outer - inner, 0.5)));
+  return { dx, dy, mix };
+}
+
+/**
+ * Same as the app's `transitionLayersOverlap`: both clips stay stacked on the
+ * same frame (no slide, wipe, flip, ripple or grid).
+ */
+export function layersOverlap(layers: TransitionLayerDto[] = []): boolean {
+  return !layers.some(
+    (l) =>
+      Boolean(l.grid) ||
+      l.property === "translateX" ||
+      l.property === "translateY" ||
+      l.property === "wipe" ||
+      l.property === "rotationY" ||
+      l.property === "ripple",
+  );
+}
+
+/**
+ * App no-dip rule (spec §4.4b): when the clips overlap, the bottom clip is
+ * drawn at min(1, bottom + top) opacity so a cross-fade never dims toward
+ * black mid-way. The app (preview + export) does this; the dashboard must too.
+ */
+export function applyNoDip(
+  evaluation: LayerEvaluation,
+  layers: TransitionLayerDto[] = [],
+): LayerEvaluation {
+  if (layers.length === 0 || !layersOverlap(layers)) return evaluation;
+  if (aShouldPaintOnTop(evaluation, layers)) {
+    return {
+      ...evaluation,
+      b: { ...evaluation.b, opacity: Math.min(1, evaluation.b.opacity + evaluation.a.opacity) },
+    };
+  }
+  return {
+    ...evaluation,
+    a: { ...evaluation.a, opacity: Math.min(1, evaluation.a.opacity + evaluation.b.opacity) },
+  };
+}
