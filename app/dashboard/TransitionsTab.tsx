@@ -24,7 +24,6 @@ import {
 
 type Props = {
   initialCatalog: TransitionCatalogDto;
-  secret: string;
 };
 
 function defaultParams(item: TransitionItemDto): Record<string, number> {
@@ -366,7 +365,7 @@ const stylesClipB: CSSProperties = {
   background: "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #ea580c 100%)",
 };
 
-export default function TransitionsTab({ initialCatalog, secret }: Props) {
+export default function TransitionsTab({ initialCatalog }: Props) {
   const [catalog, setCatalog] = useState(initialCatalog);
   const [selectedId, setSelectedId] = useState(
     initialCatalog.items[0]?.id ?? "",
@@ -560,7 +559,6 @@ export default function TransitionsTab({ initialCatalog, secret }: Props) {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          ...(secret ? { "x-dashboard-secret": secret } : {}),
         },
         body: JSON.stringify(catalog),
       });
@@ -577,7 +575,7 @@ export default function TransitionsTab({ initialCatalog, secret }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [catalog, secret, selected]);
+  }, [catalog, selected]);
 
   const reload = async () => {
     setStatus(null);

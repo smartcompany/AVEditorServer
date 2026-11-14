@@ -20,7 +20,6 @@ type AnalyticsData = {
 
 type Props = {
   mode: "revenue" | "funnel";
-  secret: string;
 };
 
 const RANGES = [7, 30, 90] as const;
@@ -39,7 +38,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
   );
 }
 
-export default function AnalyticsTab({ mode, secret }: Props) {
+export default function AnalyticsTab({ mode }: Props) {
   const [days, setDays] = useState<number>(30);
   const [platform, setPlatform] = useState<string>("");
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -54,7 +53,6 @@ export default function AnalyticsTab({ mode, secret }: Props) {
       if (platform) qs.set("platform", platform);
       const res = await fetch(`/api/analytics?${qs}`, {
         cache: "no-store",
-        headers: secret ? { "x-dashboard-secret": secret } : {},
       });
       const json = await res.json();
       if (!res.ok) {
@@ -68,7 +66,7 @@ export default function AnalyticsTab({ mode, secret }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [days, platform, secret]);
+  }, [days, platform]);
 
   useEffect(() => {
     void load();
@@ -137,7 +135,10 @@ export default function AnalyticsTab({ mode, secret }: Props) {
               </p>
             </>
           ) : error.code === "unauthorized" ? (
-            <p style={ui.muted}>오른쪽 위에 DASHBOARD_SECRET 을 입력해 주세요.</p>
+            <p style={ui.muted}>
+              권한 확인에 실패했습니다. 페이지를 새로고침해 주세요. 계속되면 서버 환경변수
+              DASHBOARD_SECRET 설정을 확인해 주세요.
+            </p>
           ) : (
             <p style={ui.muted}>
               불러오기 실패: {error.code} {error.message ?? ""}

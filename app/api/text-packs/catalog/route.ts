@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
 /** PUT — dashboard save to Supabase Storage (no redeploy). */
 export async function PUT(request: Request) {
-  if (!authorizeDashboard(request)) {
+  if (!(await authorizeDashboard(request))) {
     return Response.json({ error: "unauthorized" }, { status: 401, headers: corsHeaders() });
   }
   let body: unknown;

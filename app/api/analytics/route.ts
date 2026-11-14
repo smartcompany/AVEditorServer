@@ -14,7 +14,7 @@ type TopRow = { item_id: string; premium: boolean; events: number; installs: num
  * Requires DASHBOARD_SECRET (x-dashboard-secret header).
  */
 export async function GET(request: Request) {
-  if (!authorizeDashboard(request)) {
+  if (!(await authorizeDashboard(request))) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!hasSupabaseConfig()) {
