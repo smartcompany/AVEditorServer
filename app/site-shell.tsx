@@ -17,6 +17,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
           <Link href="/terms" style={s.navLink}>
             이용약관 · Terms
           </Link>
+          <Link href="/data-deletion" style={s.navLink}>
+            데이터 삭제 · Data deletion
+          </Link>
         </nav>
       </header>
       <main style={s.main}>{children}</main>
