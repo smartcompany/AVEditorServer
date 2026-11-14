@@ -11,10 +11,10 @@ const catalog = {
     {
       kind: "youtube",
       label: {
-        ko: "YouTube에 공유",
-        en: "Share to YouTube",
-        ja: "YouTubeにシェア",
-        zh: "分享到 YouTube",
+        ko: "YouTube",
+        en: "YouTube",
+        ja: "YouTube",
+        zh: "YouTube",
       },
     },
     {
