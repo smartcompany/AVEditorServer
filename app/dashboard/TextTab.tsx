@@ -30,7 +30,7 @@ function easeOutCubic(t: number): number {
 }
 
 /** Per-glyph opacity with overlapping windows, as in the app. */
-function staggeredOpacities(count: number, progress: number, hardCut: boolean): number[] {
+function staggeredOpacities(count: number, progress: number, hardCut = true): number[] {
   if (count <= 0) return [];
   const overlap = 0.55;
   const slot = 1 / (count + (count - 1) * overlap);
@@ -68,8 +68,11 @@ function entranceFrame(
     }
     case "typewriter":
       return { glyphOpacity: staggeredOpacities(glyphCount, t, true), layerOpacity: 1, layerDy: 0 };
-    case "fade":
-      return { glyphOpacity: staggeredOpacities(glyphCount, t, false), layerOpacity: 1, layerDy: 0 };
+    case "fade": {
+      // Whole line fades in together (same as the app's evaluateTextEntrance).
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      return { glyphOpacity: null, layerOpacity: eased, layerDy: 0 };
+    }
     default:
       return { glyphOpacity: null, layerOpacity: 1, layerDy: 0 };
   }
@@ -126,13 +129,121 @@ function previewCss(style: TextStyleTemplate, accent: string, fontPx: number) {
   if (shadows.length) text.textShadow = shadows.join(", ");
 
   const box: CSSProperties = { display: "inline-block" };
+  // Same defaults as the app's paintOverlayLineBackgrounds.
   const bg = style.lineBackground;
+  let brush: BrushPaint | null = null;
   if (bg) {
-    box.background = pick(bg.useAccent, bg.color, "#000", bg.opacity ?? 1);
-    box.padding = `${(bg.padVFactor ?? 0.12) * fontPx}px ${(bg.padHFactor ?? 0.3) * fontPx}px`;
-    box.borderRadius = bg.shape === "capsule" ? 999 : (bg.radiusFactor ?? 0.15) * fontPx;
+    const color = pick(bg.useAccent, bg.color, "#000", bg.opacity ?? 1);
+    box.padding = `${(bg.padVFactor ?? 0.14) * fontPx}px ${(bg.padHFactor ?? 0.22) * fontPx}px`;
+    const shadowOpacity = bg.shadowOpacity ?? 0;
+    const shadowBlur = Math.min(28, Math.max(2, (bg.shadowBlurFactor ?? 0.12) * fontPx));
+    if (bg.shape === "brush") {
+      // Torn paper is drawn as an SVG path behind the text (TornPaper).
+      box.position = "relative";
+      brush = { color, shadowOpacity, shadowBlur, fontPx };
+    } else {
+      // App: rounded rect, radius = fontSize × radiusFactor clamped to 4…12.
+      box.background = color;
+      box.borderRadius = Math.min(12, Math.max(4, fontPx * (bg.radiusFactor ?? 0.18)));
+      if (shadowOpacity > 0) {
+        box.boxShadow = `0 ${fontPx * 0.04}px ${shadowBlur}px rgba(0,0,0,${shadowOpacity})`;
+      }
+    }
   }
-  return { text, box };
+  return { text, box, brush };
+}
+
+type BrushPaint = { color: string; shadowOpacity: number; shadowBlur: number; fontPx: number };
+
+/**
+ * Port of the app's _tornPaperPath: wavy torn top/bottom edges and jagged
+ * end caps around a w×h strip (deterministic, seed from the rect origin).
+ */
+function tornPaperPath(left: number, top: number, w: number, h: number): string {
+  const right = left + w;
+  const bottom = top + h;
+  const seed = Math.abs(left * 0.13 + top * 0.07);
+  const n = (t: number, a: number, f: number, p: number) =>
+    Math.sin((t + seed) * f * Math.PI * 2 + p) * a;
+  const leftInset = h * 0.08;
+  const rightInset = h * 0.1;
+  const topAmp = h * 0.16;
+  const botAmp = h * 0.14;
+  const steps = 10;
+  const parts: string[] = [];
+  parts.push(`M ${left + leftInset} ${top + h * 0.42}`);
+  parts.push(
+    `Q ${left - h * 0.04} ${top + h * 0.18 + n(0.1, topAmp * 0.4, 1.7, 0.4)} ${left + leftInset * 0.6} ${top + n(0.15, topAmp, 2.1, 0.2)}`,
+  );
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const x = left + leftInset + (w - leftInset - rightInset) * t;
+    const y = top + n(t, topAmp, 2.4, 0.6) + n(t, topAmp * 0.35, 5.1, 1.3);
+    parts.push(`L ${x} ${y}`);
+  }
+  parts.push(
+    `Q ${right + h * 0.05} ${top + h * 0.35 + n(0.9, botAmp * 0.5, 1.9, 2.1)} ${right - rightInset * 0.35} ${bottom - h * 0.28 + n(1.0, botAmp * 0.3, 2.2, 0.8)}`,
+  );
+  parts.push(
+    `Q ${right + h * 0.02} ${bottom - h * 0.08} ${right - rightInset} ${bottom + n(1.05, botAmp, 2.0, 1.7)}`,
+  );
+  for (let i = steps - 1; i >= 0; i--) {
+    const t = i / steps;
+    const x = left + leftInset + (w - leftInset - rightInset) * t;
+    const y = bottom + n(t, botAmp, 2.2, 2.4) + n(t, botAmp * 0.4, 4.6, 0.9);
+    parts.push(`L ${x} ${y}`);
+  }
+  parts.push(`Q ${left - h * 0.03} ${bottom - h * 0.25} ${left + leftInset} ${top + h * 0.42}`);
+  parts.push("Z");
+  return parts.join(" ");
+}
+
+/** Torn-paper strip sized to its parent box: shadow, soft fringe, then fill. */
+function TornPaper({ paint }: { paint: BrushPaint }) {
+  const ref = useRef<SVGSVGElement | null>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const parent = ref.current?.parentElement;
+    if (!parent) return;
+    const measure = () => setSize({ w: parent.offsetWidth, h: parent.offsetHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, []);
+  const d = size ? tornPaperPath(0, 0, size.w, size.h) : "";
+  const fringeBlur = Math.min(10, Math.max(1.2, paint.fontPx * 0.08));
+  const id = useMemo(() => `torn${Math.random().toString(36).slice(2, 8)}`, []);
+  return (
+    <svg
+      ref={ref}
+      aria-hidden
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible", zIndex: 0 }}
+    >
+      <defs>
+        <filter id={`${id}s`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation={paint.shadowBlur / 2} />
+        </filter>
+        <filter id={`${id}f`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation={fringeBlur / 2} />
+        </filter>
+      </defs>
+      {size && (
+        <>
+          {paint.shadowOpacity > 0 && (
+            <path
+              d={d}
+              transform={`translate(0 ${paint.fontPx * 0.045})`}
+              fill={`rgba(0,0,0,${paint.shadowOpacity})`}
+              filter={`url(#${id}s)`}
+            />
+          )}
+          <path d={d} fill={paint.color} opacity={0.55} filter={`url(#${id}f)`} />
+          <path d={d} fill={paint.color} />
+        </>
+      )}
+    </svg>
+  );
 }
 
 const ANIMATIONS = ["typewriter", "fade", "slide_up"] as const;
@@ -573,7 +684,8 @@ function TextPreview({
           transform: `translateY(${frame.layerDy}px)`,
         }}
       >
-        <span style={css.text}>
+        {css.brush && <TornPaper paint={css.brush} />}
+        <span style={{ ...css.text, position: "relative", zIndex: 1 }}>
           {frame.glyphOpacity
             ? glyphs.map((g, i) => (
                 <span key={i} style={{ opacity: frame.glyphOpacity![i] }}>
