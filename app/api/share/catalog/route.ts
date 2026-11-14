@@ -26,8 +26,8 @@ const catalog = {
       label: { ko: "Facebook", en: "Facebook", ja: "Facebook", zh: "Facebook" },
     },
     {
-      kind: "whatsapp",
-      label: { ko: "WhatsApp", en: "WhatsApp", ja: "WhatsApp", zh: "WhatsApp" },
+      kind: "tiktok",
+      label: { ko: "TikTok", en: "TikTok", ja: "TikTok", zh: "TikTok" },
     },
   ],
 };
