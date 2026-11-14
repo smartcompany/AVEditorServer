@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AVEditor Server",
-  description: "Text template pack API for AVEditor",
+  title: "ClipGo",
+  description: "ClipGo — 쇼츠 편집부터 유튜브 업로드까지",
 };
 
 export default function RootLayout({
@@ -11,7 +11,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ko">
       <body
         style={{
           margin: 0,
