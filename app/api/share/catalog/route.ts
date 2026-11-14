@@ -22,12 +22,12 @@ const catalog = {
       label: { ko: "Instagram", en: "Instagram", ja: "Instagram", zh: "Instagram" },
     },
     {
-      kind: "whatsapp",
-      label: { ko: "WhatsApp", en: "WhatsApp", ja: "WhatsApp", zh: "WhatsApp" },
-    },
-    {
       kind: "facebook",
       label: { ko: "Facebook", en: "Facebook", ja: "Facebook", zh: "Facebook" },
+    },
+    {
+      kind: "whatsapp",
+      label: { ko: "WhatsApp", en: "WhatsApp", ja: "WhatsApp", zh: "WhatsApp" },
     },
   ],
 };
