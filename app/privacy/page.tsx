@@ -25,8 +25,16 @@ export default function PrivacyPage() {
       <Section title="2. Google 계정 및 YouTube 데이터">
         <ul>
           <li>
-            사용자가 &ldquo;YouTube 업로드&rdquo;를 선택하면 Google 로그인을 통해 YouTube 업로드 권한
-            (<code>https://www.googleapis.com/auth/youtube.upload</code>)을 요청합니다.
+            사용자가 &ldquo;YouTube 업로드&rdquo;를 선택하면 Google 로그인을 통해 다음 권한을 요청합니다:
+            <ul>
+              <li>
+                <code>https://www.googleapis.com/auth/youtube.upload</code> — 영상 업로드
+              </li>
+              <li>
+                <code>https://www.googleapis.com/auth/youtube</code> — 사용자가 재생목록 추가나
+                연령 제한을 선택한 경우에만 (채널 관리에 필요한 범위)
+              </li>
+            </ul>
           </li>
           <li>
             이 권한은 사용자가 고른 영상을 사용자가 입력한 제목·설명·태그·공개 범위·썸네일·재생목록
@@ -125,14 +133,15 @@ export default function PrivacyPage() {
       <p style={s.muted}>Effective {SITE.policyDate}</p>
       <Section title="Google account and YouTube data">
         <p>
-          When you choose to upload to YouTube, the app asks for the YouTube upload scope
-          (<code>youtube.upload</code>) via Google Sign-In. It is used only to upload the video you
-          picked, with the title, description, tags, privacy setting, thumbnail and playlist you
-          chose, to your own YouTube channel. Requests go directly from your device to the YouTube
-          Data API; your Google account data, access tokens and channel data are not sent to or
-          stored on our servers, are not sold or shared with third parties, and are not used for
-          advertising. {SITE.appName}&apos;s use and transfer of information received from Google APIs
-          adheres to the{" "}
+          When you choose to upload to YouTube, the app asks via Google Sign-In for{" "}
+          <code>youtube.upload</code> (upload the MP4 you exported) and, only when you opt into a
+          playlist or age restriction, <code>youtube</code> (playlistItems.insert / videos.update).
+          These scopes are used only to publish to <strong>your own</strong> YouTube channel with the
+          title, description, tags, privacy, thumbnail and playlist you chose. Requests go directly
+          from your device to the YouTube Data API; your Google account data, access tokens and
+          channel data are not sent to or stored on our servers, are not sold or shared with third
+          parties, and are not used for advertising. {SITE.appName}&apos;s use and transfer of
+          information received from Google APIs adheres to the{" "}
           <a href="https://developers.google.com/terms/api-services-user-data-policy" style={link}>
             Google API Services User Data Policy
           </a>

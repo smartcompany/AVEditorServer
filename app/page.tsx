@@ -6,14 +6,35 @@ import { SITE } from "@/lib/site";
 export const metadata: Metadata = {
   title: `${SITE.appName} — 쇼츠 편집부터 유튜브 업로드까지`,
   description:
-    "ClipGo는 휴대폰에서 영상을 자르고 텍스트·전환 효과·음악을 넣어 유튜브 쇼츠로 바로 올리는 동영상 편집 앱입니다.",
+    "EasyClip은 휴대폰에서 영상을 자르고 텍스트·전환 효과·음악을 넣어 유튜브 쇼츠로 바로 올리는 동영상 편집 앱입니다.",
 };
 
 /** App homepage (also the homepage URL for Google OAuth verification). */
 export default function HomePage() {
   return (
     <SiteShell>
-      <h1 style={s.h1}>쇼츠 편집부터 유튜브 업로드까지, 한 앱에서</h1>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          marginTop: 28,
+          marginBottom: 8,
+        }}
+      >
+        {/* Same mark as OAuth consent logo — brand verification matches homepage. */}
+        <img
+          src="/easyclip-oauth-logo-120.png"
+          width={72}
+          height={72}
+          alt="EasyClip"
+          style={{ borderRadius: 16, flexShrink: 0 }}
+        />
+        <h1 style={{ ...s.h1, margin: 0 }}>EasyClip</h1>
+      </div>
+      <p style={{ ...s.body, fontSize: 18, fontWeight: 600, marginTop: 0 }}>
+        쇼츠 편집부터 유튜브 업로드까지, 한 앱에서
+      </p>
       <p style={s.body}>
         {SITE.appName}는 휴대폰에서 영상을 자르고, 텍스트·전환 효과·음악을 넣어 유튜브 쇼츠로
         바로 올릴 수 있는 동영상 편집 앱입니다.
