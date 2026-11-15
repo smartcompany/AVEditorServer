@@ -6,7 +6,7 @@ import {
 } from '@/lib/applink';
 
 export const metadata = {
-  title: 'ClipGo — Download',
+  title: 'EasyClip — Download',
 };
 
 /**

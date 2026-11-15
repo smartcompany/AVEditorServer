@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "ClipGo",
-  description: "ClipGo — 쇼츠 편집부터 유튜브 업로드까지",
+  title: "EasyClip",
+  description: "EasyClip — Edit Shorts and upload to YouTube",
 };
 
 export default function RootLayout({
@@ -11,7 +11,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="en">
       <body
         style={{
           margin: 0,

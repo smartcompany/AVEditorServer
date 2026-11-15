@@ -32,7 +32,7 @@ export default function TikTokCallbackPage() {
     >
       <h1 style={{ fontSize: 20, margin: "0 0 8px" }}>EasyClip</h1>
       <p style={{ margin: "0 0 24px", color: "#555" }}>
-        앱으로 돌아가는 중이에요… / Returning to the app…
+        Returning to the app…
       </p>
       <a
         id="open-app"
@@ -47,7 +47,7 @@ export default function TikTokCallbackPage() {
           textDecoration: "none",
         }}
       >
-        EasyClip 열기 / Open EasyClip
+        Open EasyClip
       </a>
       <script dangerouslySetInnerHTML={{ __html: bounceScript }} />
     </main>

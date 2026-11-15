@@ -22,75 +22,77 @@ const code = {
 export default function YouTubeOAuthPage() {
   return (
     <SiteShell>
-      <h1 style={s.h1}>YouTube 로그인 · “확인되지 않은 앱”</h1>
+      <h1 style={s.h1}>YouTube sign-in · “unverified app”</h1>
       <p style={s.muted}>
         Google OAuth consent screen · EasyClip · {SITE.policyDate}
       </p>
 
-      <Section title="사용자에게 보이는 경우">
+      <Section title="If you see the warning">
         <ol>
           <li>
-            경고에서 <strong>고급</strong> → <strong>EasyClip(으)로 이동</strong>을
-            누릅니다.
+            On the warning screen, tap <strong>Advanced</strong> →{" "}
+            <strong>Go to EasyClip</strong>.
           </li>
           <li>
-            그래도 안 되면, 개발자가 Google Cloud{" "}
+            If that still fails, the developer must add your Google account under{" "}
+            <strong>Test users</strong> on the Google Cloud{" "}
             <a
               href="https://console.cloud.google.com/apis/credentials/consent?project=aveditor-shorts"
               style={link}
             >
-              OAuth 동의 화면
+              OAuth consent screen
             </a>
-            의 <strong>테스트 사용자</strong>에 해당 Google 계정을 추가해야 합니다.
+            .
           </li>
         </ol>
       </Section>
 
-      <Section title="개발자 체크리스트">
+      <Section title="Developer checklist">
         <ul>
           <li>
-            프로젝트: <code style={code}>aveditor-shorts</code> (
+            Project: <code style={code}>aveditor-shorts</code> (
             <code style={code}>800175376935</code>)
           </li>
           <li>
-            Scope: <code style={code}>youtube.upload</code>
+            Scopes: <code style={code}>youtube.upload</code>
             {" · "}
-            <code style={code}>youtube</code> (재생목록·연령제한 시)
+            <code style={code}>youtube</code> (playlist / age restriction)
           </li>
           <li>
-            개인정보처리방침:{" "}
+            Privacy Policy:{" "}
             <a href={`${SITE.origin}/privacy`} style={link}>
               {SITE.origin}/privacy
             </a>
           </li>
           <li>
-            이용약관:{" "}
+            Terms of Service:{" "}
             <a href={`${SITE.origin}/terms`} style={link}>
               {SITE.origin}/terms
             </a>
           </li>
           <li>
-            로고 업로드 후 반드시 <strong>Verify Branding</strong> → 상태가 Ready
-            to publish이면 <strong>Publish branding</strong>. 로고만 올리면
-            “브랜딩이 표시되지 않습니다”가 납니다.
+            After uploading the logo, run <strong>Verify Branding</strong>, then{" "}
+            <strong>Publish branding</strong> when status is Ready to publish.
+            Uploading a logo alone leaves branding unpublished.
           </li>
           <li>
-            홈페이지(
+            The homepage (
             <a href={SITE.origin} style={link}>
               {SITE.origin}
             </a>
-            )에 앱 이름 EasyClip과 동일 로고가 보여야 합니다. 배포 후 다시
-            Verify.
+            ) must show the app name EasyClip and the same logo. Re-verify after
+            deploy.
           </li>
           <li>
-            공개 배포 전: 동의 화면을 <strong>프로덕션</strong>으로 게시한 뒤
-            민감 scope <strong>앱 검증</strong>을 제출합니다. 통과 전까지는
-            테스트 사용자만 로그인할 수 있습니다.
+            Before public release: publish the consent screen to{" "}
+            <strong>Production</strong>, then submit{" "}
+            <strong>app verification</strong> for sensitive scopes. Until
+            approved, only test users can complete sign-in without the warning.
           </li>
         </ul>
       </Section>
 
-      <Section title="For reviewers (English)">
+      <Section title="For reviewers">
         <p>
           EasyClip uploads an on-device export to the signed-in user&apos;s YouTube
           channel via <code style={code}>youtube.upload</code>. Playlist / age

@@ -12,13 +12,13 @@ export function SiteShell({ children }: { children: ReactNode }) {
         </Link>
         <nav style={s.nav}>
           <Link href="/privacy" style={s.navLink}>
-            개인정보처리방침 · Privacy
+            Privacy
           </Link>
           <Link href="/terms" style={s.navLink}>
-            이용약관 · Terms
+            Terms
           </Link>
           <Link href="/data-deletion" style={s.navLink}>
-            데이터 삭제 · Data deletion
+            Data deletion
           </Link>
         </nav>
       </header>
