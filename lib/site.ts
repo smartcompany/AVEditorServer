@@ -10,5 +10,5 @@ export const SITE = {
    * Absolute origin for public policy / Facebook callback links.
    * Override with SITE_ORIGIN on Vercel if the host changes.
    */
-  origin: "https://aveditorserver.vercel.app",
+  origin: "https://easyclip.coinpang.org",
 };
