@@ -19,6 +19,16 @@ export const ANALYTICS_EVENTS = [
   "export_completed",
   "export_failed",
   "youtube_upload_completed",
+  // retention loops
+  "resume_draft_tap",
+  "share_target_tap",
+  "share_more_tap",
+  "continue_after_export",
+  "start_new_after_export",
+  "retention_draft_scheduled",
+  "retention_share_scheduled",
+  "retention_catalog_scheduled",
+  "retention_push_tap",
   // monetization
   "premium_sheet_shown",
   "premium_choice_pro",
@@ -50,6 +60,8 @@ export const FUNNEL_STEPS: { event: AnalyticsEvent; label: string }[] = [
   { event: "transition_applied", label: "전환 효과 적용" },
   { event: "export_tap", label: "내보내기 시도" },
   { event: "export_completed", label: "내보내기 완료" },
+  { event: "resume_draft_tap", label: "미완성 이어하기" },
+  { event: "share_target_tap", label: "공유 실행" },
 ];
 
 export const EVENTS_TABLE = "aveditor_events";

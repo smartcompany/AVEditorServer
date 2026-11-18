@@ -26,24 +26,19 @@ export default function PrivacyPage() {
       <Section title="2. Google account and YouTube data">
         <ul>
           <li>
-            When you choose &ldquo;YouTube upload,&rdquo; the app requests these
-            permissions via Google Sign-In:
+            When you choose &ldquo;YouTube upload,&rdquo; the app requests this
+            permission via Google Sign-In:
             <ul>
               <li>
                 <code>https://www.googleapis.com/auth/youtube.upload</code> — upload
-                video
-              </li>
-              <li>
-                <code>https://www.googleapis.com/auth/youtube</code> — only when you
-                choose a playlist or age restriction (channel management needed for
-                those actions)
+                the selected video to your own YouTube channel
               </li>
             </ul>
           </li>
           <li>
-            These scopes are used only to upload the video you selected to{" "}
+            This scope is used only to upload the video you selected to{" "}
             <strong>your own YouTube channel</strong>, with the title, description,
-            tags, privacy status, thumbnail, and playlist settings you enter.
+            tags, privacy status, and optional thumbnail you enter.
           </li>
           <li>
             Upload-related requests go directly from your device to Google (YouTube

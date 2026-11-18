@@ -54,9 +54,7 @@ export default function YouTubeOAuthPage() {
             <code style={code}>800175376935</code>)
           </li>
           <li>
-            Scopes: <code style={code}>youtube.upload</code>
-            {" · "}
-            <code style={code}>youtube</code> (playlist / age restriction)
+            Scope: <code style={code}>youtube.upload</code> only
           </li>
           <li>
             Privacy Policy:{" "}
@@ -95,9 +93,8 @@ export default function YouTubeOAuthPage() {
       <Section title="For reviewers">
         <p>
           EasyClip uploads an on-device export to the signed-in user&apos;s YouTube
-          channel via <code style={code}>youtube.upload</code>. Playlist / age
-          restriction use <code style={code}>youtube</code> only when the user
-          opts in. Tokens stay on device. Privacy:{" "}
+          channel via <code style={code}>youtube.upload</code> only. Tokens stay
+          on device. Privacy:{" "}
           <a href={`${SITE.origin}/privacy`} style={link}>
             {SITE.origin}/privacy
           </a>

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
+    "firebase-admin": "^13.10.0",
     "next": "^15.5.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
