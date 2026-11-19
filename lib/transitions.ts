@@ -989,9 +989,7 @@ export const PLUS_TRANSITION_IDS = new Set<string>([
   "spinout",
   "doorway",
   "swap",
-]);
-
-export const PRO_TRANSITION_IDS = new Set<string>([
+  // Formerly Pro — Plus-only catalog until Pro is sold.
   "cube",
   "mosaic",
   "puzzleleft",
@@ -999,6 +997,8 @@ export const PRO_TRANSITION_IDS = new Set<string>([
   "crosszoom",
   "ripple",
 ]);
+
+export const PRO_TRANSITION_IDS = new Set<string>([]);
 
 /** @deprecated Prefer PLUS_ / PRO_TRANSITION_IDS. */
 export const PREMIUM_TRANSITION_IDS = new Set<string>([
@@ -1017,7 +1017,7 @@ for (const item of BASIC) {
 }
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 43,
+  version: 44,
   baseUrl: "",
   categories: [
     {

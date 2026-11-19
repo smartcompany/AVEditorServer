@@ -344,9 +344,7 @@ export const PLUS_PACK_ITEM_IDS = new Set<string>([
   "pack_candy",
   "pack_sunset",
   "pack_breaking",
-]);
-
-export const PRO_PACK_ITEM_IDS = new Set<string>([
+  // Formerly Pro — Plus-only catalog until Pro is sold.
   "effect_neon_pink",
   "effect_neon_blue",
   "effect_gold",
@@ -357,6 +355,8 @@ export const PRO_PACK_ITEM_IDS = new Set<string>([
   "pack_gold_title",
   "pack_frost",
 ]);
+
+export const PRO_PACK_ITEM_IDS = new Set<string>([]);
 
 /** @deprecated Prefer PLUS_ / PRO_PACK_ITEM_IDS. */
 export const PREMIUM_PACK_ITEM_IDS = new Set<string>([
@@ -553,7 +553,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 9;
+export const TEXT_CATALOG_SEED_VERSION = 10;
 
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
