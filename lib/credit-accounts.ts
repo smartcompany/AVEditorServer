@@ -230,6 +230,10 @@ export async function linkFirebaseUid(
     studio: 3,
   };
 
+  // Claim any store subscriptions bought on this device before login.
+  const { claimDeviceSubscriptions } = await import("@/lib/subscriptions");
+  await claimDeviceSubscriptions(deviceKey, firebaseUid);
+
   if (!byUid || byUid.id === device.id) {
     const { data, error } = await sb
       .from("aveditor_credit_accounts")

@@ -8,7 +8,7 @@ import {
 import { hasSupabaseConfig } from "@/lib/supabase";
 import {
   findSubscriptionByStoreIdentity,
-  syncPlanTierForUid,
+  syncPlanTierForOwner,
   upsertSubscription,
 } from "@/lib/subscriptions";
 
@@ -47,10 +47,11 @@ export async function POST(request: NextRequest) {
       verified.status,
     );
 
-    const firebaseUid = existing?.firebase_uid;
-    if (!firebaseUid) {
+    const firebaseUid = existing?.firebase_uid ?? null;
+    const deviceKey = existing?.device_key ?? null;
+    if (!firebaseUid && !deviceKey) {
       console.warn(
-        "[google-notifications] no uid for token",
+        "[google-notifications] no owner for token",
         subNote.purchaseToken.slice(0, 12),
       );
       return json({ ok: true, unmatched: true });
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
 
     await upsertSubscription({
       firebaseUid,
+      deviceKey,
       platform: "android",
       productId: verified.productId,
       storeIdentity: verified.purchaseToken,
@@ -66,9 +68,12 @@ export async function POST(request: NextRequest) {
       status,
       expiresAt: verified.expiresAt,
       environment: verified.environment,
-      raw: { notificationType: subNote.notificationType, ...verified.raw as object },
+      raw: {
+        notificationType: subNote.notificationType,
+        ...(verified.raw as object),
+      },
     });
-    await syncPlanTierForUid(firebaseUid);
+    await syncPlanTierForOwner({ firebaseUid, deviceKey });
     return json({ ok: true });
   } catch (e) {
     console.error("[google-notifications]", e);

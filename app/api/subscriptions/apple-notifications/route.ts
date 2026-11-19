@@ -7,7 +7,7 @@ import {
 import { hasSupabaseConfig } from "@/lib/supabase";
 import {
   findSubscriptionByOriginalTransactionId,
-  syncPlanTierForUid,
+  syncPlanTierForOwner,
   upsertSubscription,
 } from "@/lib/subscriptions";
 
@@ -43,11 +43,11 @@ export async function POST(request: NextRequest) {
     const existing = await findSubscriptionByOriginalTransactionId(
       subscription.originalTransactionId,
     );
-    const firebaseUid = existing?.firebase_uid;
-    if (!firebaseUid) {
-      // Unknown buyer — store orphan row under placeholder uid for later claim.
+    const firebaseUid = existing?.firebase_uid ?? null;
+    const deviceKey = existing?.device_key ?? null;
+    if (!firebaseUid && !deviceKey) {
       console.warn(
-        "[apple-notifications] no uid for",
+        "[apple-notifications] no owner for",
         subscription.originalTransactionId,
       );
       return json({ ok: true, unmatched: true });
@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
 
     await upsertSubscription({
       firebaseUid,
+      deviceKey,
       platform: "ios",
       productId: subscription.productId,
       storeIdentity: subscription.originalTransactionId,
@@ -62,9 +63,12 @@ export async function POST(request: NextRequest) {
       status,
       expiresAt: subscription.expiresAt,
       environment: subscription.environment,
-      raw: { notificationType: notification.notificationType, ...subscription.raw as object },
+      raw: {
+        notificationType: notification.notificationType,
+        ...(subscription.raw as object),
+      },
     });
-    await syncPlanTierForUid(firebaseUid);
+    await syncPlanTierForOwner({ firebaseUid, deviceKey });
     return json({ ok: true });
   } catch (e) {
     console.error("[apple-notifications]", e);

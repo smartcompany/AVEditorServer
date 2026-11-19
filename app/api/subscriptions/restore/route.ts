@@ -5,10 +5,10 @@ import {
   verifyAppleSignedTransaction,
 } from "@/lib/apple-iap";
 import { verifyGoogleSubscription } from "@/lib/google-iap";
-import { requireFirebaseUser } from "@/lib/request-auth";
+import { optionalFirebaseUser } from "@/lib/request-auth";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import {
-  syncPlanTierForUid,
+  syncPlanTierForOwner,
   upsertSubscription,
 } from "@/lib/subscriptions";
 
@@ -29,7 +29,8 @@ type RestoreItem = {
 
 /**
  * POST /api/subscriptions/restore
- * Re-verify a batch of store purchases for the signed-in user.
+ * Body: { deviceKey, purchases?: RestoreItem[] }
+ * Optional Authorization: Bearer <Firebase ID token>
  */
 export async function POST(request: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -37,11 +38,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const user = await requireFirebaseUser(request);
-    const body = (await request.json()) as { purchases?: RestoreItem[] };
+    const user = await optionalFirebaseUser(request);
+    const body = (await request.json()) as {
+      deviceKey?: string;
+      purchases?: RestoreItem[];
+    };
+    const deviceKey = body.deviceKey?.trim();
+    if (!deviceKey && !user) {
+      return json({ error: "deviceKey_required" }, 400);
+    }
+
+    const owner = {
+      firebaseUid: user?.uid ?? null,
+      deviceKey: deviceKey || null,
+    };
     const purchases = Array.isArray(body.purchases) ? body.purchases : [];
     if (purchases.length === 0) {
-      const synced = await syncPlanTierForUid(user.uid);
+      const synced = await syncPlanTierForOwner(owner);
       return json({ planTier: synced.planTier, restored: 0 });
     }
 
@@ -57,7 +70,7 @@ export async function POST(request: NextRequest) {
           }
           if (!verified) continue;
           await upsertSubscription({
-            firebaseUid: user.uid,
+            ...owner,
             platform: "ios",
             productId: verified.productId,
             storeIdentity: verified.originalTransactionId,
@@ -77,7 +90,7 @@ export async function POST(request: NextRequest) {
             purchaseToken: token,
           });
           await upsertSubscription({
-            firebaseUid: user.uid,
+            ...owner,
             platform: "android",
             productId: verified.productId,
             storeIdentity: verified.purchaseToken,
@@ -95,7 +108,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const synced = await syncPlanTierForUid(user.uid);
+    const synced = await syncPlanTierForOwner(owner);
     return json({
       planTier: synced.planTier,
       restored,

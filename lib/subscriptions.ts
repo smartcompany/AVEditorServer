@@ -1,6 +1,8 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
+  bootstrapAccount,
   ensureMonthlyGrant,
+  findAccountByDevice,
   findAccountByUid,
   type CreditAccount,
 } from "@/lib/credit-accounts";
@@ -18,7 +20,8 @@ export type SubscriptionStatus =
 
 export type SubscriptionRow = {
   id: string;
-  firebase_uid: string;
+  firebase_uid: string | null;
+  device_key: string | null;
   platform: StorePlatform;
   product_id: string;
   tier: Exclude<PlanTier, "free">;
@@ -35,7 +38,7 @@ export type SubscriptionRow = {
 };
 
 const SUB_COLS =
-  "id, firebase_uid, platform, product_id, tier, store_identity, original_transaction_id, purchase_token, status, expires_at, environment, raw, last_verified_at, created_at, updated_at";
+  "id, firebase_uid, device_key, platform, product_id, tier, store_identity, original_transaction_id, purchase_token, status, expires_at, environment, raw, last_verified_at, created_at, updated_at";
 
 const PRODUCT_TIER: Record<string, Exclude<PlanTier, "free">> = {
   easyclip_plus_monthly: "plus",
@@ -78,7 +81,10 @@ export function isSubscriptionActive(
 }
 
 export type UpsertSubscriptionInput = {
-  firebaseUid: string;
+  /** Optional — set when the app user is signed in. */
+  firebaseUid?: string | null;
+  /** Install/device key — used when there is no app login. */
+  deviceKey?: string | null;
   platform: StorePlatform;
   productId: string;
   storeIdentity: string;
@@ -97,6 +103,9 @@ export async function upsertSubscription(
   if (!tier) {
     throw new Error(`unknown_product:${input.productId}`);
   }
+  if (!input.firebaseUid && !input.deviceKey) {
+    throw new Error("owner_required");
+  }
 
   const expiresAt =
     input.expiresAt == null
@@ -105,13 +114,22 @@ export async function upsertSubscription(
         ? input.expiresAt.toISOString()
         : input.expiresAt;
 
+  // Preserve any existing owner fields when webhook updates omit one side.
+  const existing = await findSubscriptionByStoreIdentity(
+    input.platform,
+    input.storeIdentity,
+  );
+  const firebaseUid = input.firebaseUid ?? existing?.firebase_uid ?? null;
+  const deviceKey = input.deviceKey ?? existing?.device_key ?? null;
+
   const sb = getSupabaseAdmin();
   const now = new Date().toISOString();
   const { data, error } = await sb
     .from("aveditor_subscriptions")
     .upsert(
       {
-        firebase_uid: input.firebaseUid,
+        firebase_uid: firebaseUid,
+        device_key: deviceKey,
         platform: input.platform,
         product_id: input.productId,
         tier,
@@ -144,6 +162,42 @@ export async function listSubscriptionsForUid(
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data as SubscriptionRow[]) ?? [];
+}
+
+export async function listSubscriptionsForDevice(
+  deviceKey: string,
+): Promise<SubscriptionRow[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("aveditor_subscriptions")
+    .select(SUB_COLS)
+    .eq("device_key", deviceKey)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data as SubscriptionRow[]) ?? [];
+}
+
+export async function listSubscriptionsForOwner(opts: {
+  firebaseUid?: string | null;
+  deviceKey?: string | null;
+}): Promise<SubscriptionRow[]> {
+  const uid = opts.firebaseUid?.trim() || null;
+  const deviceKey = opts.deviceKey?.trim() || null;
+  if (!uid && !deviceKey) return [];
+
+  if (uid && deviceKey) {
+    const [byUid, byDevice] = await Promise.all([
+      listSubscriptionsForUid(uid),
+      listSubscriptionsForDevice(deviceKey),
+    ]);
+    const map = new Map<string, SubscriptionRow>();
+    for (const row of [...byUid, ...byDevice]) map.set(row.id, row);
+    return [...map.values()].sort((a, b) =>
+      (b.updated_at || "").localeCompare(a.updated_at || ""),
+    );
+  }
+  if (uid) return listSubscriptionsForUid(uid);
+  return listSubscriptionsForDevice(deviceKey!);
 }
 
 export async function findSubscriptionByStoreIdentity(
@@ -209,68 +263,106 @@ export function bestActiveTier(
   return best;
 }
 
+async function applyPlanTierToAccount(
+  account: CreditAccount,
+  planTier: PlanTier,
+): Promise<CreditAccount> {
+  if (account.plan_tier === planTier) {
+    return ensureMonthlyGrant(account);
+  }
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb
+    .from("aveditor_credit_accounts")
+    .update({
+      plan_tier: planTier,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", account.id)
+    .select(
+      "id, device_key, firebase_uid, balance, plan_tier, last_credit_grant_ym",
+    )
+    .single();
+  if (error) throw error;
+  return ensureMonthlyGrant(data as CreditAccount);
+}
+
 /**
  * Recompute credit account plan_tier from active subscriptions.
- * Creates no account if the user has none yet and tier is free.
+ * Prefer device account when deviceKey is present; otherwise uid account.
  */
+export async function syncPlanTierForOwner(opts: {
+  firebaseUid?: string | null;
+  deviceKey?: string | null;
+}): Promise<{ planTier: PlanTier; account: CreditAccount | null }> {
+  const firebaseUid = opts.firebaseUid?.trim() || null;
+  const deviceKey = opts.deviceKey?.trim() || null;
+  const rows = await listSubscriptionsForOwner({ firebaseUid, deviceKey });
+  const planTier = bestActiveTier(rows);
+
+  let account: CreditAccount | null = null;
+  if (deviceKey) {
+    account = await findAccountByDevice(deviceKey);
+    if (!account && planTier !== "free") {
+      account = await bootstrapAccount(deviceKey);
+    }
+  }
+  if (!account && firebaseUid) {
+    account = await findAccountByUid(firebaseUid);
+    if (!account && planTier !== "free") {
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb
+        .from("aveditor_credit_accounts")
+        .upsert(
+          {
+            device_key: `uid:${firebaseUid}`,
+            firebase_uid: firebaseUid,
+            balance: 0,
+            plan_tier: planTier,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "firebase_uid" },
+        )
+        .select(
+          "id, device_key, firebase_uid, balance, plan_tier, last_credit_grant_ym",
+        )
+        .single();
+      if (error) {
+        account = await findAccountByUid(firebaseUid);
+        if (!account) throw error;
+      } else {
+        account = data as CreditAccount;
+      }
+    }
+  }
+
+  if (!account) {
+    return { planTier, account: null };
+  }
+
+  account = await applyPlanTierToAccount(account, planTier);
+  return { planTier: account.plan_tier, account };
+}
+
 export async function syncPlanTierForUid(
   firebaseUid: string,
 ): Promise<{ planTier: PlanTier; account: CreditAccount | null }> {
-  const rows = await listSubscriptionsForUid(firebaseUid);
-  const planTier = bestActiveTier(rows);
-  let account = await findAccountByUid(firebaseUid);
+  return syncPlanTierForOwner({ firebaseUid });
+}
 
-  if (!account) {
-    if (planTier === "free") {
-      return { planTier, account: null };
-    }
-    // Ensure an account exists so monthly grants can apply.
-    const sb = getSupabaseAdmin();
-    const deviceKey = `uid:${firebaseUid}`;
-    const { data, error } = await sb
-      .from("aveditor_credit_accounts")
-      .upsert(
-        {
-          device_key: deviceKey,
-          firebase_uid: firebaseUid,
-          balance: 0,
-          plan_tier: planTier,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "firebase_uid" },
-      )
-      .select(
-        "id, device_key, firebase_uid, balance, plan_tier, last_credit_grant_ym",
-      )
-      .single();
-    if (error) {
-      // Race / unique on device_key — fall back to lookup.
-      account = await findAccountByUid(firebaseUid);
-      if (!account) throw error;
-    } else {
-      account = data as CreditAccount;
-    }
-  }
-
-  if (account.plan_tier !== planTier) {
-    const sb = getSupabaseAdmin();
-    const { data, error } = await sb
-      .from("aveditor_credit_accounts")
-      .update({
-        plan_tier: planTier,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", account.id)
-      .select(
-        "id, device_key, firebase_uid, balance, plan_tier, last_credit_grant_ym",
-      )
-      .single();
-    if (error) throw error;
-    account = data as CreditAccount;
-  }
-
-  account = await ensureMonthlyGrant(account);
-  return { planTier: account.plan_tier, account };
+/** Attach device-owned store rows to a Firebase uid after app login. */
+export async function claimDeviceSubscriptions(
+  deviceKey: string,
+  firebaseUid: string,
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  await sb
+    .from("aveditor_subscriptions")
+    .update({
+      firebase_uid: firebaseUid,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("device_key", deviceKey);
+  await syncPlanTierForOwner({ firebaseUid, deviceKey });
 }
 
 /** Support/dashboard override — does not create a store row. */

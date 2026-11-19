@@ -11,7 +11,8 @@ type AccountInfo = {
 
 type SubRow = {
   id: string;
-  firebase_uid: string;
+  firebase_uid: string | null;
+  device_key?: string | null;
   platform: string;
   product_id: string;
   tier: string;
@@ -142,8 +143,9 @@ export default function SubscriptionsTab() {
         <div>
           <h2 style={ui.h1}>구독</h2>
           <p style={ui.sub}>
-            Apple / Google 검증 결과와 credit account plan_tier를 조회합니다.
-            결제는 앱 스토어에서만 이뤄집니다.
+            고객이 “결제했는데 등급이 안 열려요” 할 때 쓰는 지원 도구입니다.
+            결제는 폰의 Apple / Google 계정으로만 되고, 여기선 조회·임시
+            등급 변경만 합니다.
           </p>
         </div>
       </div>
@@ -229,7 +231,7 @@ export default function SubscriptionsTab() {
         <table style={styles.table}>
           <thead>
             <tr>
-              {["platform", "product", "tier", "status", "expires", "env", "uid"].map(
+              {["platform", "product", "tier", "status", "expires", "env", "owner"].map(
                 (h) => (
                   <th key={h} style={styles.th}>
                     {h}
@@ -261,7 +263,9 @@ export default function SubscriptionsTab() {
                   </td>
                   <td style={styles.td}>{r.environment || "—"}</td>
                   <td style={styles.td}>
-                    <code style={{ fontSize: 11 }}>{r.firebase_uid}</code>
+                    <code style={{ fontSize: 11 }}>
+                      {r.firebase_uid || r.device_key || "—"}
+                    </code>
                   </td>
                 </tr>
               ))

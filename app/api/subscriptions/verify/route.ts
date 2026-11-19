@@ -5,10 +5,10 @@ import {
   lookupAppleTransaction,
 } from "@/lib/apple-iap";
 import { verifyGoogleSubscription } from "@/lib/google-iap";
-import { requireFirebaseUser } from "@/lib/request-auth";
+import { optionalFirebaseUser } from "@/lib/request-auth";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import {
-  syncPlanTierForUid,
+  syncPlanTierForOwner,
   upsertSubscription,
   type StorePlatform,
 } from "@/lib/subscriptions";
@@ -22,17 +22,16 @@ function json(data: unknown, status = 200) {
 
 /**
  * POST /api/subscriptions/verify
- * Authorization: Bearer <Firebase ID token>
  * Body:
  *  {
+ *    deviceKey: string,                 // required (no app login)
  *    platform: "ios" | "android",
  *    productId: string,
- *    // iOS: StoreKit 2 JWS (preferred) and/or transactionId
- *    verificationData?: string,
+ *    verificationData?: string,         // iOS JWS
  *    transactionId?: string,
- *    // Android
- *    purchaseToken?: string,
+ *    purchaseToken?: string,            // Android
  *  }
+ * Optional Authorization: Bearer <Firebase ID token>
  */
 export async function POST(request: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -40,8 +39,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const user = await requireFirebaseUser(request);
+    const user = await optionalFirebaseUser(request);
     const body = (await request.json()) as {
+      deviceKey?: string;
       platform?: string;
       productId?: string;
       verificationData?: string;
@@ -49,12 +49,20 @@ export async function POST(request: NextRequest) {
       purchaseToken?: string;
     };
 
+    const deviceKey = body.deviceKey?.trim();
+    if (!deviceKey) return json({ error: "deviceKey_required" }, 400);
+
     const platform = body.platform as StorePlatform | undefined;
     const productId = body.productId?.trim();
     if (platform !== "ios" && platform !== "android") {
       return json({ error: "platform_required" }, 400);
     }
     if (!productId) return json({ error: "productId_required" }, 400);
+
+    const owner = {
+      firebaseUid: user?.uid ?? null,
+      deviceKey,
+    };
 
     if (platform === "ios") {
       let verified = body.verificationData
@@ -71,7 +79,7 @@ export async function POST(request: NextRequest) {
       }
 
       await upsertSubscription({
-        firebaseUid: user.uid,
+        ...owner,
         platform: "ios",
         productId: verified.productId,
         storeIdentity: verified.originalTransactionId,
@@ -91,7 +99,7 @@ export async function POST(request: NextRequest) {
         purchaseToken,
       });
       await upsertSubscription({
-        firebaseUid: user.uid,
+        ...owner,
         platform: "android",
         productId: verified.productId,
         storeIdentity: verified.purchaseToken,
@@ -104,12 +112,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const synced = await syncPlanTierForUid(user.uid);
+    const synced = await syncPlanTierForOwner(owner);
     return json({
       planTier: synced.planTier,
-      expiresAt: synced.account
-        ? undefined
-        : null,
       balance: synced.account?.balance ?? null,
     });
   } catch (e) {
