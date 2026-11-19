@@ -35,8 +35,22 @@ function requiredEnv(name: string): string {
 }
 
 function applePrivateKeyPem(): string {
-  const raw = requiredEnv("APPLE_IAP_PRIVATE_KEY");
-  return raw.includes("BEGIN") ? raw : raw.replace(/\\n/g, "\n");
+  let raw = requiredEnv("APPLE_IAP_PRIVATE_KEY");
+  // Vercel / .env often wrap the PEM in quotes.
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    raw = raw.slice(1, -1);
+  }
+  // Always unescape \n — "BEGIN" can be present while newlines are still literal.
+  const pem = raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+  if (!pem.includes("BEGIN PRIVATE KEY") && !pem.includes("BEGIN EC PRIVATE")) {
+    throw new Error(
+      "apple_private_key_invalid: expected PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)",
+    );
+  }
+  return pem;
 }
 
 function base64url(input: Buffer | string): string {

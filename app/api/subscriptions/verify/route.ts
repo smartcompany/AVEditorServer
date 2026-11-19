@@ -65,10 +65,15 @@ export async function POST(request: NextRequest) {
     };
 
     if (platform === "ios") {
-      let verified = body.verificationData
-        ? verifyAppleSignedTransaction(body.verificationData)
-        : null;
-      if (!verified && body.transactionId) {
+      let verified = null as ReturnType<typeof verifyAppleSignedTransaction> | null;
+      if (body.verificationData?.trim()) {
+        try {
+          verified = verifyAppleSignedTransaction(body.verificationData.trim());
+        } catch (e) {
+          console.warn("[subscriptions verify] apple JWS failed:", e);
+        }
+      }
+      if (!verified && body.transactionId?.trim()) {
         verified = await lookupAppleTransaction(body.transactionId.trim());
       }
       if (!verified) {
