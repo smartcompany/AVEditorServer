@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { grantAdReward } from "@/lib/credit-accounts";
-import { AD_REWARD_CREDITS } from "@/lib/credits";
+import { getPlansConfig } from "@/lib/plans-config-store";
 import { hasSupabaseConfig } from "@/lib/supabase";
 
 function json(data: unknown, status = 200) {
@@ -21,10 +21,16 @@ export async function POST(request: NextRequest) {
     const deviceKey = body.deviceKey?.trim();
     if (!deviceKey) return json({ error: "deviceKey_required" }, 400);
 
-    const account = await grantAdReward(deviceKey);
+    const [account, plansConfig] = await Promise.all([
+      grantAdReward(deviceKey),
+      getPlansConfig(),
+    ]);
     return json({
       balance: account.balance,
-      granted: AD_REWARD_CREDITS,
+      granted: Math.max(
+        0,
+        Math.floor(plansConfig.economy.adRewardCredits || 0),
+      ),
       planTier: account.plan_tier,
     });
   } catch (e) {

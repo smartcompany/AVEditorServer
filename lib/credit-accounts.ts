@@ -1,7 +1,5 @@
 import { getSupabaseAdmin } from "./supabase";
 import {
-  AD_REWARD_CREDITS,
-  STARTING_CREDITS,
   costFor,
   monthlyCreditsFor,
   totalCost,
@@ -77,11 +75,12 @@ export async function bootstrapAccount(
   const existing = await findAccountByDevice(deviceKey);
   if (existing) return ensureMonthlyGrant(existing);
 
+  // Dashboard economy.startingCredits is authoritative — including 0.
   const plansConfig = await getPlansConfig();
-  const starting =
-    plansConfig.economy.startingCredits > 0
-      ? plansConfig.economy.startingCredits
-      : STARTING_CREDITS;
+  const starting = Math.max(
+    0,
+    Math.floor(plansConfig.economy.startingCredits || 0),
+  );
 
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
@@ -100,7 +99,9 @@ export async function bootstrapAccount(
     throw error;
   }
   const account = data as CreditAccount;
-  await ledger(account.id, starting, "bootstrap");
+  if (starting > 0) {
+    await ledger(account.id, starting, "bootstrap");
+  }
   return ensureMonthlyGrant(account);
 }
 
@@ -158,10 +159,11 @@ export async function grantAdReward(deviceKey: string): Promise<CreditAccount> {
   }
 
   const plansConfig = await getPlansConfig();
-  const reward =
-    plansConfig.economy.adRewardCredits > 0
-      ? plansConfig.economy.adRewardCredits
-      : AD_REWARD_CREDITS;
+  const reward = Math.max(
+    0,
+    Math.floor(plansConfig.economy.adRewardCredits || 0),
+  );
+  if (reward <= 0) return account;
   const next = account.balance + reward;
   const { data, error } = await sb
     .from("aveditor_credit_accounts")

@@ -250,6 +250,109 @@ export async function lookupAppleTransaction(
   throw new Error("apple_transaction_not_found");
 }
 
+type AppleSubscriptionGroupStatus = {
+  lastTransactions?: Array<{
+    originalTransactionId?: string;
+    status?: number;
+    signedTransactionInfo?: string;
+  }>;
+};
+
+/**
+ * Current auto-renewable status for an original transaction id.
+ * https://developer.apple.com/documentation/appstoreserverapi/get_all_subscription_statuses
+ */
+async function fetchAppleSubscriptionStatuses(
+  originalTransactionId: string,
+  environment: "Production" | "Sandbox",
+): Promise<AppleVerifiedSubscription | null> {
+  const host =
+    environment === "Sandbox"
+      ? "https://api.storekit-sandbox.itunes.apple.com"
+      : "https://api.storekit.itunes.apple.com";
+  const token = createAppleApiToken();
+  const res = await fetch(
+    `${host}/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`apple_sub_api_${res.status}:${body.slice(0, 200)}`);
+  }
+  const json = (await res.json()) as {
+    data?: AppleSubscriptionGroupStatus[];
+  };
+  let best: AppleVerifiedSubscription | null = null;
+  for (const group of json.data ?? []) {
+    for (const last of group.lastTransactions ?? []) {
+      const signed = last.signedTransactionInfo;
+      if (!signed) continue;
+      const verified = verifyAppleSignedTransaction(signed);
+      if (!best) {
+        best = verified;
+        continue;
+      }
+      const bestExp = best.expiresAt?.getTime() ?? 0;
+      const nextExp = verified.expiresAt?.getTime() ?? 0;
+      if (nextExp >= bestExp) best = verified;
+    }
+  }
+  return best;
+}
+
+/**
+ * If the client JWS is an old/expired renewal period (common in Sandbox),
+ * ask Apple for the current subscription status and prefer that.
+ */
+export async function resolveAppleSubscription(
+  verified: AppleVerifiedSubscription,
+): Promise<AppleVerifiedSubscription> {
+  if (
+    verified.status === "active" ||
+    verified.status === "grace" ||
+    verified.status === "billing_retry"
+  ) {
+    return verified;
+  }
+
+  const prefer = process.env.APPLE_IAP_ENVIRONMENT?.trim();
+  const order: Array<"Production" | "Sandbox"> =
+    prefer === "Sandbox"
+      ? ["Sandbox", "Production"]
+      : verified.environment === "Sandbox"
+        ? ["Sandbox", "Production"]
+        : ["Production", "Sandbox"];
+
+  for (const env of order) {
+    try {
+      const current = await fetchAppleSubscriptionStatuses(
+        verified.originalTransactionId,
+        env,
+      );
+      if (
+        current &&
+        (current.status === "active" ||
+          current.status === "grace" ||
+          current.status === "billing_retry")
+      ) {
+        return current;
+      }
+      if (current) return current;
+    } catch (e) {
+      console.warn(
+        "[apple-iap] subscription status lookup failed:",
+        env,
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+  return verified;
+}
+
 export type AppleNotification = {
   notificationType?: string;
   subtype?: string;

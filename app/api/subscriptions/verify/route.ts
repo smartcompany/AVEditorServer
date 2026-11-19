@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   verifyAppleSignedTransaction,
   lookupAppleTransaction,
+  resolveAppleSubscription,
 } from "@/lib/apple-iap";
 import { verifyGoogleSubscription } from "@/lib/google-iap";
 import { optionalFirebaseUser } from "@/lib/request-auth";
@@ -94,6 +95,9 @@ export async function POST(request: NextRequest) {
           400,
         );
       }
+      // Sandbox (and renewals) often redeliver an expired period JWS — ask Apple
+      // for the current subscription status before writing free/expired.
+      verified = await resolveAppleSubscription(verified);
       if (verified.productId !== productId) {
         return json({ error: "product_mismatch" }, 400);
       }
