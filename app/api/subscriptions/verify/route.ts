@@ -66,18 +66,33 @@ export async function POST(request: NextRequest) {
 
     if (platform === "ios") {
       let verified = null as ReturnType<typeof verifyAppleSignedTransaction> | null;
+      let jwsError: string | null = null;
+      let lookupError: string | null = null;
       if (body.verificationData?.trim()) {
         try {
           verified = verifyAppleSignedTransaction(body.verificationData.trim());
         } catch (e) {
-          console.warn("[subscriptions verify] apple JWS failed:", e);
+          jwsError = e instanceof Error ? e.message : String(e);
+          console.warn("[subscriptions verify] apple JWS failed:", jwsError);
         }
       }
       if (!verified && body.transactionId?.trim()) {
-        verified = await lookupAppleTransaction(body.transactionId.trim());
+        try {
+          verified = await lookupAppleTransaction(body.transactionId.trim());
+        } catch (e) {
+          lookupError = e instanceof Error ? e.message : String(e);
+          console.warn("[subscriptions verify] apple lookup failed:", lookupError);
+        }
       }
       if (!verified) {
-        return json({ error: "ios_verification_required" }, 400);
+        return json(
+          {
+            error: "ios_verification_required",
+            jwsError,
+            lookupError,
+          },
+          400,
+        );
       }
       if (verified.productId !== productId) {
         return json({ error: "product_mismatch" }, 400);

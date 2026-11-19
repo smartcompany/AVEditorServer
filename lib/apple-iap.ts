@@ -11,10 +11,10 @@
 
 import {
   createPrivateKey,
-  createPublicKey,
-  createSign,
-  createVerify,
+  sign as cryptoSign,
+  verify as cryptoVerify,
   X509Certificate,
+  type KeyObject,
 } from "crypto";
 import type { SubscriptionStatus } from "@/lib/subscriptions";
 
@@ -53,6 +53,16 @@ function applePrivateKeyPem(): string {
   return pem;
 }
 
+function loadApplePrivateKey(): KeyObject {
+  const key = createPrivateKey({ key: applePrivateKeyPem(), format: "pem" });
+  if (key.type !== "private") {
+    throw new Error(
+      `apple_private_key_invalid: key.type=${key.type} (expected private)`,
+    );
+  }
+  return key;
+}
+
 function base64url(input: Buffer | string): string {
   const buf = typeof input === "string" ? Buffer.from(input) : input;
   return buf
@@ -60,6 +70,12 @@ function base64url(input: Buffer | string): string {
     .replace(/=/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
+}
+
+function base64urlToBuffer(value: string): Buffer {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+  return Buffer.from(padded + pad, "base64");
 }
 
 /** ES256 client JWT for App Store Server API. */
@@ -79,43 +95,19 @@ export function createAppleApiToken(): string {
   const unsigned = `${base64url(JSON.stringify(header))}.${base64url(
     JSON.stringify(payload),
   )}`;
-  const key = createPrivateKey(applePrivateKeyPem());
-  const sign = createSign("SHA256");
-  sign.update(unsigned);
-  sign.end();
+  const key = loadApplePrivateKey();
   // Apple expects IEEE P1363 (r||s), not DER.
-  const der = sign.sign(key);
-  const p1363 = derToJose(der, 64);
-  return `${unsigned}.${base64url(p1363)}`;
-}
-
-function derToJose(der: Buffer, size: number): Buffer {
-  // Minimal ECDSA DER → raw r||s
-  let offset = 2;
-  if (der[1] & 0x80) offset += der[1] & 0x7f;
-  if (der[offset] !== 0x02) throw new Error("apple_jwt_bad_der");
-  const rLen = der[offset + 1];
-  let r = der.subarray(offset + 2, offset + 2 + rLen);
-  offset = offset + 2 + rLen;
-  if (der[offset] !== 0x02) throw new Error("apple_jwt_bad_der");
-  const sLen = der[offset + 1];
-  let s = der.subarray(offset + 2, offset + 2 + sLen);
-  if (r[0] === 0x00) r = r.subarray(1);
-  if (s[0] === 0x00) s = s.subarray(1);
-  const out = Buffer.alloc(size);
-  r.copy(out, size / 2 - r.length);
-  s.copy(out, size - s.length);
-  return out;
+  const sig = cryptoSign("sha256", Buffer.from(unsigned), {
+    key,
+    dsaEncoding: "ieee-p1363",
+  });
+  return `${unsigned}.${base64url(sig)}`;
 }
 
 function decodeJwsPayload<T = Record<string, unknown>>(jws: string): T {
   const parts = jws.split(".");
   if (parts.length < 2) throw new Error("invalid_jws");
-  const json = Buffer.from(
-    parts[1]!.replace(/-/g, "+").replace(/_/g, "/"),
-    "base64",
-  ).toString("utf8");
-  return JSON.parse(json) as T;
+  return JSON.parse(base64urlToBuffer(parts[1]!).toString("utf8")) as T;
 }
 
 /**
@@ -126,42 +118,23 @@ export function verifyAppleJws<T = Record<string, unknown>>(jws: string): T {
   const parts = jws.split(".");
   if (parts.length !== 3) throw new Error("invalid_jws");
   const header = JSON.parse(
-    Buffer.from(parts[0]!.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
-      "utf8",
-    ),
+    base64urlToBuffer(parts[0]!).toString("utf8"),
   ) as { x5c?: string[]; alg?: string };
   const x5c = header.x5c?.[0];
   if (!x5c) throw new Error("jws_missing_x5c");
   const certPem = `-----BEGIN CERTIFICATE-----\n${x5c.match(/.{1,64}/g)?.join("\n")}\n-----END CERTIFICATE-----\n`;
   const cert = new X509Certificate(certPem);
-  const key = createPublicKey(cert.publicKey);
   const data = Buffer.from(`${parts[0]}.${parts[1]}`);
-  const sig = Buffer.from(
-    parts[2]!.replace(/-/g, "+").replace(/_/g, "/"),
-    "base64",
+  const sig = base64urlToBuffer(parts[2]!);
+  // StoreKit JWS uses ES256 with IEEE P1363 signatures.
+  const ok = cryptoVerify(
+    "sha256",
+    data,
+    { key: cert.publicKey, dsaEncoding: "ieee-p1363" },
+    sig,
   );
-  // Convert JOSE to DER for verify
-  const der = joseToDer(sig);
-  const verify = createVerify("SHA256");
-  verify.update(data);
-  verify.end();
-  if (!verify.verify(key, der)) throw new Error("jws_signature_invalid");
+  if (!ok) throw new Error("jws_signature_invalid");
   return decodeJwsPayload<T>(jws);
-}
-
-function joseToDer(jose: Buffer): Buffer {
-  const size = jose.length / 2;
-  let r = jose.subarray(0, size);
-  let s = jose.subarray(size);
-  if (r[0]! & 0x80) r = Buffer.concat([Buffer.from([0]), r]);
-  if (s[0]! & 0x80) s = Buffer.concat([Buffer.from([0]), s]);
-  const len = 2 + r.length + 2 + s.length;
-  return Buffer.concat([
-    Buffer.from([0x30, len, 0x02, r.length]),
-    r,
-    Buffer.from([0x02, s.length]),
-    s,
-  ]);
 }
 
 type AppleTx = {
@@ -209,7 +182,24 @@ export function subscriptionFromAppleTransaction(
 export function verifyAppleSignedTransaction(
   signedTransaction: string,
 ): AppleVerifiedSubscription {
-  const tx = verifyAppleJws<AppleTx>(signedTransaction);
+  const trimmed = signedTransaction.trim();
+  // Some clients wrap the JWS in JSON; unwrap if needed.
+  let jws = trimmed;
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed) as {
+        signedTransactionInfo?: string;
+        jws?: string;
+      };
+      jws =
+        parsed.signedTransactionInfo?.trim() ||
+        parsed.jws?.trim() ||
+        trimmed;
+    } catch {
+      // keep raw
+    }
+  }
+  const tx = verifyAppleJws<AppleTx>(jws);
   return subscriptionFromAppleTransaction(tx, tx);
 }
 
