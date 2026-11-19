@@ -23,6 +23,7 @@ export default function PlansTab({ initialConfig }: Props) {
   const [selectedId, setSelectedId] = useState<PlanTier>("plus");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [locale, setLocale] = useState<keyof LocaleMap>("ko");
 
@@ -38,6 +39,84 @@ export default function PlansTab({ initialConfig }: Props) {
     }));
     setDirty(true);
   };
+
+  /** Fill other locales from the currently selected language tab. */
+  const applyLocaleTranslation = useCallback(async () => {
+    const plan = config.plans.find((p) => p.id === selectedId);
+    if (!plan) return;
+
+    const from = locale;
+    const targets = LOCALES.filter((l) => l !== from);
+    const sources = [
+      plan.titles[from].trim(),
+      plan.subtitle[from].trim(),
+      ...plan.benefits.map((b) => b[from].trim()),
+    ];
+    if (sources.every((s) => !s)) {
+      setStatus(
+        `${from.toUpperCase()} 문구가 비어 있습니다. 먼저 작성한 뒤 번역 적용을 눌러 주세요.`,
+      );
+      return;
+    }
+
+    setTranslating(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from,
+          to: targets,
+          texts: sources,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setStatus(
+          `번역 실패: ${json.message || json.error || res.status}`,
+        );
+        return;
+      }
+      const translations = json.translations as Partial<
+        Record<keyof LocaleMap, string[]>
+      >;
+
+      const nextTitles: LocaleMap = { ...plan.titles };
+      const nextSubtitle: LocaleMap = { ...plan.subtitle };
+      const nextBenefits = plan.benefits.map((b) => ({ ...b }));
+
+      for (const lang of targets) {
+        const rows = translations[lang] ?? [];
+        if (sources[0]) nextTitles[lang] = rows[0] ?? nextTitles[lang];
+        if (sources[1]) nextSubtitle[lang] = rows[1] ?? nextSubtitle[lang];
+        for (let i = 0; i < nextBenefits.length; i++) {
+          const src = sources[2 + i];
+          if (!src) continue;
+          nextBenefits[i] = {
+            ...nextBenefits[i],
+            [lang]: rows[2 + i] ?? nextBenefits[i][lang],
+          };
+        }
+      }
+
+      updatePlan(plan.id, {
+        title: nextTitles.en || plan.title,
+        titles: nextTitles,
+        subtitle: nextSubtitle,
+        benefits: nextBenefits,
+      });
+      setStatus(
+        `${plan.id.toUpperCase()} ${from.toUpperCase()} → ${targets
+          .map((t) => t.toUpperCase())
+          .join(" / ")} 번역 적용됨 (Save로 저장)`,
+      );
+    } catch (error) {
+      setStatus(`번역 실패: ${error}`);
+    } finally {
+      setTranslating(false);
+    }
+  }, [config.plans, selectedId, locale]);
 
   const updateEconomy = (patch: Partial<PlansConfig["economy"]>) => {
     setConfig((prev) => ({
@@ -193,6 +272,18 @@ export default function PlansTab({ initialConfig }: Props) {
                 {l.toUpperCase()}
               </button>
             ))}
+            <button
+              type="button"
+              style={{
+                ...ui.btnTiny,
+                ...styles.translateBtn,
+              }}
+              disabled={translating}
+              onClick={() => void applyLocaleTranslation()}
+              title={`현재 ${locale.toUpperCase()} 탭 문구를 다른 언어에 번역해 채웁니다`}
+            >
+              {translating ? "번역 중…" : "번역 적용"}
+            </button>
           </div>
 
           <h3 style={ui.h3}>{selected.id.toUpperCase()}</h3>
@@ -397,11 +488,24 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 11,
     fontWeight: 700,
   },
-  localeBar: { display: "flex", gap: 6, marginBottom: 12 },
+  localeBar: {
+    display: "flex",
+    gap: 6,
+    marginBottom: 12,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
   localeActive: {
     color: "#0b0d12",
     background: "#4cc9f0",
     borderColor: "#4cc9f0",
+  },
+  translateBtn: {
+    marginLeft: 4,
+    color: "#0b0d12",
+    background: "#ffd166",
+    borderColor: "#ffd166",
+    fontWeight: 700,
   },
   benefitRow: {
     display: "grid",
