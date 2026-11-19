@@ -349,6 +349,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
           id,
           title: "New",
           kind,
+          accessTier: "free",
           premium: false,
           downloadSizeBytes: 0,
           ...(kind === "template" ? { animation: { id: "fade" as const } } : {}),
@@ -471,7 +472,21 @@ export default function TextTab({ initialCatalog, view }: Props) {
                 >
                   <span style={ui.listTitle}>
                     {item.title}
-                    {item.premium ? <span style={ui.proBadge}>PRO</span> : null}
+                    {(() => {
+                      const tier =
+                        item.accessTier ?? (item.premium ? "pro" : "free");
+                      if (tier === "plus") {
+                        return (
+                          <span style={{ ...ui.proBadge, background: "#2563EB" }}>
+                            PLUS
+                          </span>
+                        );
+                      }
+                      if (tier === "pro") {
+                        return <span style={ui.proBadge}>PRO</span>;
+                      }
+                      return null;
+                    })()}
                   </span>
                   <span style={ui.listId}>{item.id}</span>
                 </button>
@@ -515,13 +530,29 @@ export default function TextTab({ initialCatalog, view }: Props) {
             </label>
 
             <h3 style={ui.h3}>설정</h3>
-            <label style={ui.checkRow}>
-              <input
-                type="checkbox"
-                checked={Boolean(selected.premium)}
-                onChange={(e) => patchSelected({ premium: e.target.checked })}
-              />
-              Pro 전용 (무료 사용자는 내보낼 때 구독·광고·효과 빼기 중 선택)
+            <label style={ui.fieldLabel}>
+              구독 레벨 (효과는 크레딧 소모 없음 · Plus는 Plus만, Pro/Studio는 Plus+Pro)
+              <select
+                value={
+                  selected.accessTier === "plus" || selected.accessTier === "pro"
+                    ? selected.accessTier
+                    : selected.premium
+                      ? "pro"
+                      : "free"
+                }
+                onChange={(e) => {
+                  const accessTier = e.target.value as "free" | "plus" | "pro";
+                  patchSelected({
+                    accessTier,
+                    premium: accessTier !== "free",
+                  });
+                }}
+                style={ui.input}
+              >
+                <option value="free">Free</option>
+                <option value="plus">Plus</option>
+                <option value="pro">Pro</option>
+              </select>
             </label>
             <div style={ui.fieldGrid}>
               <label style={ui.fieldLabel}>

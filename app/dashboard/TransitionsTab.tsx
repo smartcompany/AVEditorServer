@@ -695,7 +695,21 @@ export default function TransitionsTab({ initialCatalog }: Props) {
                   >
                     <span style={styles.listTitle}>
                       {itemTitle(item)}
-                      {item.premium ? <span style={styles.proBadge}>PRO</span> : null}
+                      {(() => {
+                        const tier =
+                          item.accessTier ?? (item.premium ? "pro" : "free");
+                        if (tier === "plus") {
+                          return (
+                            <span style={{ ...styles.proBadge, background: "#2563EB" }}>
+                              PLUS
+                            </span>
+                          );
+                        }
+                        if (tier === "pro") {
+                          return <span style={styles.proBadge}>PRO</span>;
+                        }
+                        return null;
+                      })()}
                     </span>
                     <span style={styles.listId}>{item.id}</span>
                   </button>
@@ -784,13 +798,29 @@ export default function TransitionsTab({ initialCatalog }: Props) {
 
             <div style={styles.block}>
               <h3 style={styles.h3}>Settings</h3>
-              <label style={styles.checkRow}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(selected.premium)}
-                  onChange={(e) => patchSelected({ premium: e.target.checked })}
-                />
-                Pro 전용 (무료 사용자는 내보낼 때 구독·광고·효과 빼기 중 선택)
+              <label style={styles.numLabel}>
+                구독 레벨 (효과는 크레딧 소모 없음 · Plus는 Plus만, Pro/Studio는 Plus+Pro)
+                <select
+                  value={
+                    selected.accessTier === "plus" || selected.accessTier === "pro"
+                      ? selected.accessTier
+                      : selected.premium
+                        ? "pro"
+                        : "free"
+                  }
+                  onChange={(e) => {
+                    const accessTier = e.target.value as "free" | "plus" | "pro";
+                    patchSelected({
+                      accessTier,
+                      premium: accessTier !== "free",
+                    });
+                  }}
+                  style={styles.numInput}
+                >
+                  <option value="free">Free</option>
+                  <option value="plus">Plus</option>
+                  <option value="pro">Pro</option>
+                </select>
               </label>
               <div style={styles.fieldGrid}>
                 {(["ko", "en", "ja", "zh"] as const).map((lang) => (

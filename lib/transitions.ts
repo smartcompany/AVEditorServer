@@ -108,6 +108,9 @@ export type TransitionItemDto = {
   minDurationMs: number;
   maxDurationMs: number;
   accent: string;
+  /** free | plus | pro — effects never cost credits. */
+  accessTier?: "free" | "plus" | "pro";
+  /** Legacy mirror: true when accessTier is plus or pro. */
   premium?: boolean;
   thumbnailUrl?: string;
   previewUrl?: string;
@@ -144,6 +147,7 @@ type XfadeOpts = {
   defaultDurationMs?: number;
   minDurationMs?: number;
   maxDurationMs?: number;
+  accessTier?: "free" | "plus" | "pro";
   premium?: boolean;
   layers?: TransitionLayerDto[];
   parameters?: Record<string, TransitionParameterDto>;
@@ -191,7 +195,8 @@ function xfade(
     minDurationMs: opts.minDurationMs ?? 100,
     maxDurationMs: opts.maxDurationMs ?? 3000,
     accent,
-    premium: opts.premium ?? false,
+    accessTier: opts.accessTier ?? (opts.premium ? "pro" : "free"),
+    premium: (opts.accessTier ?? (opts.premium ? "pro" : "free")) !== "free",
     thumbnailUrl: `transitions/thumbs/${id}.webp`,
     layers: opts.layers,
     parameters: opts.parameters,
@@ -976,28 +981,43 @@ const BASIC: TransitionItemDto[] = [
 ];
 
 /**
- * Pro-only transitions. Free users can preview them in the editor; export
- * asks for Pro, a rewarded ad, or removing them. Basics stay free.
+ * Effect access tiers (CapCut-style). Credits are AI-only — these never
+ * cost credits. Plus unlocks Plus; Pro/Studio unlock Plus + Pro.
  */
-export const PREMIUM_TRANSITION_IDS = new Set<string>([
+export const PLUS_TRANSITION_IDS = new Set<string>([
   "spinin",
   "spinout",
   "doorway",
+  "swap",
+]);
+
+export const PRO_TRANSITION_IDS = new Set<string>([
   "cube",
   "mosaic",
   "puzzleleft",
   "puzzleright",
   "crosszoom",
   "ripple",
-  "swap",
+]);
+
+/** @deprecated Prefer PLUS_ / PRO_TRANSITION_IDS. */
+export const PREMIUM_TRANSITION_IDS = new Set<string>([
+  ...PLUS_TRANSITION_IDS,
+  ...PRO_TRANSITION_IDS,
 ]);
 
 for (const item of BASIC) {
-  item.premium = PREMIUM_TRANSITION_IDS.has(item.id);
+  const accessTier = PRO_TRANSITION_IDS.has(item.id)
+    ? "pro"
+    : PLUS_TRANSITION_IDS.has(item.id)
+      ? "plus"
+      : "free";
+  item.accessTier = accessTier;
+  item.premium = accessTier !== "free";
 }
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 42,
+  version: 43,
   baseUrl: "",
   categories: [
     {
