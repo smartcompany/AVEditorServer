@@ -22,6 +22,12 @@ export type PlanConfigItem = {
   aiEnabled: boolean;
   /** Credits granted once per calendar month while on this plan. */
   monthlyCredits: number;
+  /**
+   * When false, the plan is hidden from the app paywall (paid tiers) and
+   * treated as unavailable for new purchases. Free is the baseline state
+   * for non-subscribers even if other tiers are disabled.
+   */
+  enabled: boolean;
 };
 
 export type PlansEconomy = {
@@ -82,6 +88,7 @@ export function defaultPlansConfig(): PlansConfig {
         editingUnlocked: false,
         aiEnabled: false,
         monthlyCredits: 0,
+        enabled: true,
       },
       {
         id: "plus",
@@ -116,6 +123,7 @@ export function defaultPlansConfig(): PlansConfig {
         editingUnlocked: true,
         aiEnabled: false,
         monthlyCredits: 500,
+        enabled: true,
       },
       {
         id: "pro",
@@ -156,6 +164,7 @@ export function defaultPlansConfig(): PlansConfig {
         editingUnlocked: true,
         aiEnabled: true,
         monthlyCredits: 1500,
+        enabled: true,
       },
       {
         id: "studio",
@@ -202,6 +211,7 @@ export function defaultPlansConfig(): PlansConfig {
         editingUnlocked: true,
         aiEnabled: true,
         monthlyCredits: 4000,
+        enabled: true,
       },
     ],
   };

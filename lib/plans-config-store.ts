@@ -35,7 +35,9 @@ function isPlanItem(value: unknown): value is PlanConfigItem {
     p.benefits.every(isLocaleMap) &&
     typeof p.editingUnlocked === "boolean" &&
     typeof p.aiEnabled === "boolean" &&
-    typeof p.monthlyCredits === "number"
+    typeof p.monthlyCredits === "number" &&
+    // Older Storage payloads omit enabled — treat as enabled in normalize.
+    (p.enabled === undefined || typeof p.enabled === "boolean")
   );
 }
 
@@ -71,6 +73,10 @@ export function normalizePlansConfig(raw: PlansConfig): PlansConfig {
       benefits:
         incoming.benefits.length > 0 ? incoming.benefits : fallback.benefits,
       monthlyCredits: Math.max(0, Math.floor(incoming.monthlyCredits)),
+      enabled:
+        typeof incoming.enabled === "boolean"
+          ? incoming.enabled
+          : fallback.enabled,
     };
   });
   return {

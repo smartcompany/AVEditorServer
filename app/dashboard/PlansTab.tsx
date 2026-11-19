@@ -160,9 +160,15 @@ export default function PlansTab({ initialConfig }: Props) {
                 style={{
                   ...styles.sideItem,
                   ...(active ? styles.sideItemActive : {}),
+                  ...(plan.enabled === false ? styles.sideItemOff : {}),
                 }}
               >
-                <strong>{plan.title}</strong>
+                <strong>
+                  {plan.title}
+                  {plan.enabled === false ? (
+                    <span style={styles.offBadge}> OFF</span>
+                  ) : null}
+                </strong>
                 <span style={ui.muted}>
                   {plan.monthlyCredits.toLocaleString()} / mo
                   {plan.aiEnabled ? " · AI" : ""}
@@ -190,6 +196,19 @@ export default function PlansTab({ initialConfig }: Props) {
           </div>
 
           <h3 style={ui.h3}>{selected.id.toUpperCase()}</h3>
+
+          <div style={styles.row}>
+            <label style={styles.check}>
+              <input
+                type="checkbox"
+                checked={selected.enabled !== false}
+                onChange={(e) =>
+                  updatePlan(selected.id, { enabled: e.target.checked })
+                }
+              />
+              활성화 (페이월에 표시 · Free는 미구독 기본 상태)
+            </label>
+          </div>
 
           <div style={styles.row}>
             <label style={styles.label}>
@@ -369,6 +388,14 @@ const styles: Record<string, CSSProperties> = {
   sideItemActive: {
     background: "#1b2130",
     border: "1px solid #ff6b6b",
+  },
+  sideItemOff: {
+    opacity: 0.55,
+  },
+  offBadge: {
+    color: "#ff8a8a",
+    fontSize: 11,
+    fontWeight: 700,
   },
   localeBar: { display: "flex", gap: 6, marginBottom: 12 },
   localeActive: {
