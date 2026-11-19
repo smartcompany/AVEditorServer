@@ -104,9 +104,9 @@ export default function PrivacyPage() {
       <Section title="5. Payments (Pro subscription)">
         <p>
           Subscriptions are processed by the App Store or Google Play; the app does
-          not receive card or other payment details. RevenueCat processes an
-          anonymous user ID and purchase records to check subscription status. Cancel
-          a subscription in your store account settings.
+          not receive card or other payment details. Our server verifies store
+          receipts/tokens against your signed-in account to check subscription
+          status. Cancel a subscription in your store account settings.
         </p>
       </Section>
 

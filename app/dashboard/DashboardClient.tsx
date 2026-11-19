@@ -6,6 +6,7 @@ import type { PlansConfig } from "@/lib/plans-config";
 import type { TransitionCatalogDto } from "@/lib/transitions";
 import AnalyticsTab from "./AnalyticsTab";
 import PlansTab from "./PlansTab";
+import SubscriptionsTab from "./SubscriptionsTab";
 import TextTab from "./TextTab";
 import TransitionsTab from "./TransitionsTab";
 
@@ -16,6 +17,7 @@ const TABS = [
   { id: "textEffects", label: "텍스트 효과" },
   { id: "textTemplates", label: "텍스트 템플릿" },
   { id: "plans", label: "구독 플랜" },
+  { id: "subscriptions", label: "구독" },
   { id: "revenue", label: "수익 (구독·광고)" },
   { id: "funnel", label: "사용자 흐름" },
 ] as const;
@@ -98,6 +100,7 @@ export default function DashboardClient({
       <div style={{ display: tab === "plans" ? "block" : "none" }}>
         <PlansTab initialConfig={initialPlans} />
       </div>
+      {tab === "subscriptions" && <SubscriptionsTab />}
       {tab === "revenue" && <AnalyticsTab mode="revenue" />}
       {tab === "funnel" && <AnalyticsTab mode="funnel" />}
     </div>
