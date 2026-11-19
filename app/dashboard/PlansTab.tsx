@@ -331,6 +331,37 @@ export default function PlansTab({ initialConfig }: Props) {
             </label>
           </div>
 
+          {selected.id !== "free" && (
+            <div style={styles.row}>
+              <label style={styles.label}>
+                Store Product ID (monthly)
+                <input
+                  style={styles.input}
+                  value={selected.storeProductIdMonthly ?? ""}
+                  placeholder="com.smartcompany.aveditor.plus.monthly"
+                  onChange={(e) =>
+                    updatePlan(selected.id, {
+                      storeProductIdMonthly: e.target.value.trim(),
+                    })
+                  }
+                />
+              </label>
+              <label style={styles.label}>
+                Store Product ID (annual)
+                <input
+                  style={styles.input}
+                  value={selected.storeProductIdAnnual ?? ""}
+                  placeholder="com.smartcompany.aveditor.plus.annual"
+                  onChange={(e) =>
+                    updatePlan(selected.id, {
+                      storeProductIdAnnual: e.target.value.trim(),
+                    })
+                  }
+                />
+              </label>
+            </div>
+          )}
+
           <div style={styles.row}>
             <label style={styles.check}>
               <input

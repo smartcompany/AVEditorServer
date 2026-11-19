@@ -7,6 +7,8 @@ import {
   type CreditAccount,
 } from "@/lib/credit-accounts";
 import type { PlanTier } from "@/lib/credits";
+import { getPlansConfig } from "@/lib/plans-config-store";
+import type { PlanConfigItem, PlansConfig } from "@/lib/plans-config";
 
 export type StorePlatform = "ios" | "android";
 
@@ -40,15 +42,6 @@ export type SubscriptionRow = {
 const SUB_COLS =
   "id, firebase_uid, device_key, platform, product_id, tier, store_identity, original_transaction_id, purchase_token, status, expires_at, environment, raw, last_verified_at, created_at, updated_at";
 
-const PRODUCT_TIER: Record<string, Exclude<PlanTier, "free">> = {
-  easyclip_plus_monthly: "plus",
-  easyclip_plus_annual: "plus",
-  easyclip_pro_monthly: "pro",
-  easyclip_pro_annual: "pro",
-  easyclip_studio_monthly: "studio",
-  easyclip_studio_annual: "studio",
-};
-
 const TIER_RANK: Record<PlanTier, number> = {
   free: 0,
   plus: 1,
@@ -56,13 +49,41 @@ const TIER_RANK: Record<PlanTier, number> = {
   studio: 3,
 };
 
-export const ALL_STORE_PRODUCT_IDS = Object.keys(PRODUCT_TIER);
+function productIdMapFromPlans(
+  plans: PlanConfigItem[],
+): Record<string, Exclude<PlanTier, "free">> {
+  const map: Record<string, Exclude<PlanTier, "free">> = {};
+  for (const plan of plans) {
+    if (plan.id === "free") continue;
+    const tier = plan.id as Exclude<PlanTier, "free">;
+    const monthly = plan.storeProductIdMonthly?.trim();
+    const annual = plan.storeProductIdAnnual?.trim();
+    if (monthly) map[monthly] = tier;
+    if (annual) map[annual] = tier;
+  }
+  return map;
+}
 
-export function tierFromProductId(
+export function tierFromProductIdInConfig(
+  config: PlansConfig,
   productId: string | null | undefined,
 ): Exclude<PlanTier, "free"> | null {
   if (!productId) return null;
-  return PRODUCT_TIER[productId] ?? null;
+  return productIdMapFromPlans(config.plans)[productId] ?? null;
+}
+
+/** Resolve tier from dashboard-configured Product IDs. */
+export async function tierFromProductId(
+  productId: string | null | undefined,
+): Promise<Exclude<PlanTier, "free"> | null> {
+  if (!productId) return null;
+  const config = await getPlansConfig();
+  return tierFromProductIdInConfig(config, productId);
+}
+
+export async function allStoreProductIds(): Promise<string[]> {
+  const config = await getPlansConfig();
+  return Object.keys(productIdMapFromPlans(config.plans));
 }
 
 export function isSubscriptionActive(
@@ -99,7 +120,7 @@ export type UpsertSubscriptionInput = {
 export async function upsertSubscription(
   input: UpsertSubscriptionInput,
 ): Promise<SubscriptionRow> {
-  const tier = tierFromProductId(input.productId);
+  const tier = await tierFromProductId(input.productId);
   if (!tier) {
     throw new Error(`unknown_product:${input.productId}`);
   }

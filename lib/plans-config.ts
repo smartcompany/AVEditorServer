@@ -28,6 +28,13 @@ export type PlanConfigItem = {
    * for non-subscribers even if other tiers are disabled.
    */
   enabled: boolean;
+  /**
+   * App Store / Play Product ID for the monthly SKU (ASC 제품 ID).
+   * Empty for Free. Example: com.smartcompany.aveditor.plus.monthly
+   */
+  storeProductIdMonthly: string;
+  /** App Store / Play Product ID for the annual SKU. Empty for Free. */
+  storeProductIdAnnual: string;
 };
 
 export type PlansEconomy = {
@@ -89,6 +96,8 @@ export function defaultPlansConfig(): PlansConfig {
         aiEnabled: false,
         monthlyCredits: 0,
         enabled: true,
+        storeProductIdMonthly: "",
+        storeProductIdAnnual: "",
       },
       {
         id: "plus",
@@ -124,6 +133,8 @@ export function defaultPlansConfig(): PlansConfig {
         aiEnabled: false,
         monthlyCredits: 500,
         enabled: true,
+        storeProductIdMonthly: "com.smartcompany.aveditor.plus.monthly",
+        storeProductIdAnnual: "com.smartcompany.aveditor.plus.annual",
       },
       {
         id: "pro",
@@ -164,7 +175,9 @@ export function defaultPlansConfig(): PlansConfig {
         editingUnlocked: true,
         aiEnabled: true,
         monthlyCredits: 1500,
-        enabled: true,
+        enabled: false,
+        storeProductIdMonthly: "com.smartcompany.aveditor.pro.monthly",
+        storeProductIdAnnual: "com.smartcompany.aveditor.pro.annual",
       },
       {
         id: "studio",
@@ -211,7 +224,9 @@ export function defaultPlansConfig(): PlansConfig {
         editingUnlocked: true,
         aiEnabled: true,
         monthlyCredits: 4000,
-        enabled: true,
+        enabled: false,
+        storeProductIdMonthly: "com.smartcompany.aveditor.studio.monthly",
+        storeProductIdAnnual: "com.smartcompany.aveditor.studio.annual",
       },
     ],
   };

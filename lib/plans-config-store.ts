@@ -37,7 +37,12 @@ function isPlanItem(value: unknown): value is PlanConfigItem {
     typeof p.aiEnabled === "boolean" &&
     typeof p.monthlyCredits === "number" &&
     // Older Storage payloads omit enabled — treat as enabled in normalize.
-    (p.enabled === undefined || typeof p.enabled === "boolean")
+    (p.enabled === undefined || typeof p.enabled === "boolean") &&
+    // Older payloads omit store product ids — filled in normalize.
+    (p.storeProductIdMonthly === undefined ||
+      typeof p.storeProductIdMonthly === "string") &&
+    (p.storeProductIdAnnual === undefined ||
+      typeof p.storeProductIdAnnual === "string")
   );
 }
 
@@ -77,6 +82,14 @@ export function normalizePlansConfig(raw: PlansConfig): PlansConfig {
         typeof incoming.enabled === "boolean"
           ? incoming.enabled
           : fallback.enabled,
+      storeProductIdMonthly:
+        typeof incoming.storeProductIdMonthly === "string"
+          ? incoming.storeProductIdMonthly.trim()
+          : fallback.storeProductIdMonthly,
+      storeProductIdAnnual:
+        typeof incoming.storeProductIdAnnual === "string"
+          ? incoming.storeProductIdAnnual.trim()
+          : fallback.storeProductIdAnnual,
     };
   });
   return {
