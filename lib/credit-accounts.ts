@@ -3,11 +3,12 @@ import {
   AD_REWARD_CREDITS,
   STARTING_CREDITS,
   costFor,
-  planUnlocksEditing,
+  monthlyCreditsFor,
   totalCost,
   type CreditItemKind,
   type PlanTier,
 } from "./credits";
+import { getPlansConfig } from "./plans-config-store";
 
 export type CreditAccount = {
   id: string;
@@ -15,7 +16,17 @@ export type CreditAccount = {
   firebase_uid: string | null;
   balance: number;
   plan_tier: PlanTier;
+  last_credit_grant_ym: string | null;
 };
+
+const ACCOUNT_COLS =
+  "id, device_key, firebase_uid, balance, plan_tier, last_credit_grant_ym";
+
+function currentGrantYm(now = new Date()): string {
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
 
 async function ledger(
   accountId: string,
@@ -39,7 +50,7 @@ export async function findAccountByDevice(
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("aveditor_credit_accounts")
-    .select("id, device_key, firebase_uid, balance, plan_tier")
+    .select(ACCOUNT_COLS)
     .eq("device_key", deviceKey)
     .maybeSingle();
   if (error) throw error;
@@ -52,39 +63,76 @@ export async function findAccountByUid(
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("aveditor_credit_accounts")
-    .select("id, device_key, firebase_uid, balance, plan_tier")
+    .select(ACCOUNT_COLS)
     .eq("firebase_uid", firebaseUid)
     .maybeSingle();
   if (error) throw error;
   return (data as CreditAccount | null) ?? null;
 }
 
-/** Create account with starting credits, or return existing. */
+/** Create account with starting credits, or return existing (+ monthly grant). */
 export async function bootstrapAccount(
   deviceKey: string,
 ): Promise<CreditAccount> {
   const existing = await findAccountByDevice(deviceKey);
-  if (existing) return existing;
+  if (existing) return ensureMonthlyGrant(existing);
+
+  const plansConfig = await getPlansConfig();
+  const starting =
+    plansConfig.economy.startingCredits > 0
+      ? plansConfig.economy.startingCredits
+      : STARTING_CREDITS;
 
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("aveditor_credit_accounts")
     .insert({
       device_key: deviceKey,
-      balance: STARTING_CREDITS,
+      balance: starting,
       plan_tier: "free",
     })
-    .select("id, device_key, firebase_uid, balance, plan_tier")
+    .select(ACCOUNT_COLS)
     .single();
   if (error) {
     // Race: another request created it.
     const again = await findAccountByDevice(deviceKey);
-    if (again) return again;
+    if (again) return ensureMonthlyGrant(again);
     throw error;
   }
   const account = data as CreditAccount;
-  await ledger(account.id, STARTING_CREDITS, "bootstrap");
-  return account;
+  await ledger(account.id, starting, "bootstrap");
+  return ensureMonthlyGrant(account);
+}
+
+/**
+ * Once per calendar month, add the plan's monthly credit allotment.
+ * Free tier is a no-op. Idempotent via last_credit_grant_ym.
+ */
+export async function ensureMonthlyGrant(
+  account: CreditAccount,
+): Promise<CreditAccount> {
+  const plansConfig = await getPlansConfig();
+  const amount = monthlyCreditsFor(account.plan_tier, plansConfig);
+  if (amount <= 0) return account;
+
+  const ym = currentGrantYm();
+  if (account.last_credit_grant_ym === ym) return account;
+
+  const sb = getSupabaseAdmin();
+  const next = account.balance + amount;
+  const { data, error } = await sb
+    .from("aveditor_credit_accounts")
+    .update({
+      balance: next,
+      last_credit_grant_ym: ym,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", account.id)
+    .select(ACCOUNT_COLS)
+    .single();
+  if (error) throw error;
+  await ledger(account.id, amount, "monthly_grant", ym);
+  return data as CreditAccount;
 }
 
 export async function grantAdReward(deviceKey: string): Promise<CreditAccount> {
@@ -109,15 +157,20 @@ export async function grantAdReward(deviceKey: string): Promise<CreditAccount> {
     }
   }
 
-  const next = account.balance + AD_REWARD_CREDITS;
+  const plansConfig = await getPlansConfig();
+  const reward =
+    plansConfig.economy.adRewardCredits > 0
+      ? plansConfig.economy.adRewardCredits
+      : AD_REWARD_CREDITS;
+  const next = account.balance + reward;
   const { data, error } = await sb
     .from("aveditor_credit_accounts")
     .update({ balance: next, updated_at: new Date().toISOString() })
     .eq("id", account.id)
-    .select("id, device_key, firebase_uid, balance, plan_tier")
+    .select(ACCOUNT_COLS)
     .single();
   if (error) throw error;
-  await ledger(account.id, AD_REWARD_CREDITS, "ad_reward");
+  await ledger(account.id, reward, "ad_reward");
   return data as CreditAccount;
 }
 
@@ -125,10 +178,9 @@ export async function spendCredits(
   deviceKey: string,
   items: Array<{ kind: CreditItemKind; id: string }>,
 ): Promise<{ account: CreditAccount; cost: number; skipped: boolean }> {
+  // Paid plans still spend credits — they receive a monthly allotment instead
+  // of unlimited free exports.
   const account = await bootstrapAccount(deviceKey);
-  if (planUnlocksEditing(account.plan_tier)) {
-    return { account, cost: 0, skipped: true };
-  }
 
   const cost = totalCost(items);
   if (cost <= 0) {
@@ -150,7 +202,7 @@ export async function spendCredits(
     .update({ balance: next, updated_at: new Date().toISOString() })
     .eq("id", account.id)
     .eq("balance", account.balance) // optimistic
-    .select("id, device_key, firebase_uid, balance, plan_tier")
+    .select(ACCOUNT_COLS)
     .maybeSingle();
   if (error) throw error;
   if (!data) {
@@ -186,11 +238,11 @@ export async function linkFirebaseUid(
         updated_at: new Date().toISOString(),
       })
       .eq("id", device.id)
-      .select("id, device_key, firebase_uid, balance, plan_tier")
+      .select(ACCOUNT_COLS)
       .single();
     if (error) throw error;
     await ledger(device.id, 0, "link_uid", firebaseUid);
-    return data as CreditAccount;
+    return ensureMonthlyGrant(data as CreditAccount);
   }
 
   // Merge: keep uid row, add device balance, delete device row.
@@ -208,7 +260,7 @@ export async function linkFirebaseUid(
       updated_at: new Date().toISOString(),
     })
     .eq("id", byUid.id)
-    .select("id, device_key, firebase_uid, balance, plan_tier")
+    .select(ACCOUNT_COLS)
     .single();
   if (error) throw error;
 
@@ -216,7 +268,7 @@ export async function linkFirebaseUid(
     await ledger(byUid.id, device.balance, "migrate_from_device", deviceKey);
   }
   await sb.from("aveditor_credit_accounts").delete().eq("id", device.id);
-  return data as CreditAccount;
+  return ensureMonthlyGrant(data as CreditAccount);
 }
 
 export { costFor, totalCost };

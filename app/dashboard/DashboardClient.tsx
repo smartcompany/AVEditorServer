@@ -2,8 +2,10 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import type { TextTemplatePackCatalog } from "@/lib/catalog";
+import type { PlansConfig } from "@/lib/plans-config";
 import type { TransitionCatalogDto } from "@/lib/transitions";
 import AnalyticsTab from "./AnalyticsTab";
+import PlansTab from "./PlansTab";
 import TextTab from "./TextTab";
 import TransitionsTab from "./TransitionsTab";
 
@@ -13,6 +15,7 @@ const TABS = [
   { id: "transitions", label: "전환 효과" },
   { id: "textEffects", label: "텍스트 효과" },
   { id: "textTemplates", label: "텍스트 템플릿" },
+  { id: "plans", label: "구독 플랜" },
   { id: "revenue", label: "수익 (구독·광고)" },
   { id: "funnel", label: "사용자 흐름" },
 ] as const;
@@ -22,9 +25,14 @@ type TabId = (typeof TABS)[number]["id"];
 type Props = {
   initialTransitions: TransitionCatalogDto;
   initialText: TextTemplatePackCatalog;
+  initialPlans: PlansConfig;
 };
 
-export default function DashboardClient({ initialTransitions, initialText }: Props) {
+export default function DashboardClient({
+  initialTransitions,
+  initialText,
+  initialPlans,
+}: Props) {
   const [tab, setTab] = useState<TabId>("transitions");
 
   useEffect(() => {
@@ -86,6 +94,9 @@ export default function DashboardClient({ initialTransitions, initialText }: Pro
          
           view={tab === "textTemplates" ? "templates" : "effects"}
         />
+      </div>
+      <div style={{ display: tab === "plans" ? "block" : "none" }}>
+        <PlansTab initialConfig={initialPlans} />
       </div>
       {tab === "revenue" && <AnalyticsTab mode="revenue" />}
       {tab === "funnel" && <AnalyticsTab mode="funnel" />}

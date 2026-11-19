@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { getPlansConfig } from "@/lib/plans-config-store";
 import { getTextPackCatalog } from "@/lib/text-catalog-store";
 import { getTransitionCatalog } from "@/lib/transition-catalog-store";
 import DashboardClient from "./DashboardClient";
@@ -9,9 +10,16 @@ export default async function DashboardPage() {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto")?.split(",")[0] ?? (host.startsWith("localhost") ? "http" : "https");
-  const [transitions, text] = await Promise.all([
+  const [transitions, text, plans] = await Promise.all([
     getTransitionCatalog(),
     getTextPackCatalog(`${proto}://${host}`),
+    getPlansConfig(),
   ]);
-  return <DashboardClient initialTransitions={transitions} initialText={text} />;
+  return (
+    <DashboardClient
+      initialTransitions={transitions}
+      initialText={text}
+      initialPlans={plans}
+    />
+  );
 }

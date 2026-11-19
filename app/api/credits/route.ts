@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapAccount } from "@/lib/credit-accounts";
-import { PLANS, costMap } from "@/lib/credits";
+import { costMap } from "@/lib/credits";
+import { getPlansConfig } from "@/lib/plans-config-store";
 import { hasSupabaseConfig } from "@/lib/supabase";
 
 function json(data: unknown, status = 200) {
@@ -20,12 +21,16 @@ export async function GET(request: NextRequest) {
   if (!deviceKey) return json({ error: "deviceKey_required" }, 400);
 
   try {
-    const account = await bootstrapAccount(deviceKey);
+    const [account, plansConfig] = await Promise.all([
+      bootstrapAccount(deviceKey),
+      getPlansConfig(),
+    ]);
     return json({
       balance: account.balance,
       planTier: account.plan_tier,
-      economy: costMap(),
-      plans: PLANS,
+      economy: costMap(plansConfig),
+      plans: plansConfig.plans,
+      plansVersion: plansConfig.version,
     });
   } catch (e) {
     console.error("[credits GET]", e);

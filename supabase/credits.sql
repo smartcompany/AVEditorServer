@@ -9,9 +9,15 @@ create table if not exists public.aveditor_credit_accounts (
   balance      integer not null default 0 check (balance >= 0),
   plan_tier    text not null default 'free'
                check (plan_tier in ('free', 'plus', 'pro', 'studio')),
+  -- Calendar month of the last subscription credit grant, e.g. '2026-11'.
+  last_credit_grant_ym text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+-- Safe for existing projects that already ran an older credits.sql.
+alter table public.aveditor_credit_accounts
+  add column if not exists last_credit_grant_ym text;
 
 create index if not exists aveditor_credit_accounts_firebase_uid_idx
   on public.aveditor_credit_accounts (firebase_uid)
