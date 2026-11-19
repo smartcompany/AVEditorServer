@@ -12,7 +12,7 @@ import { ui } from "./ui";
 type Props = { initialConfig: PlansConfig };
 
 const LOCALES: Array<keyof LocaleMap> = ["en", "ko", "ja", "zh"];
-const TIER_ORDER: PlanTier[] = ["plus", "pro", "studio", "free"];
+const TIER_ORDER: PlanTier[] = ["free", "plus", "pro", "studio"];
 
 function emptyLocale(): LocaleMap {
   return { en: "", ko: "", ja: "", zh: "" };
