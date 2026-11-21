@@ -1,7 +1,8 @@
 /**
- * Apple universal links for the iOS app. TikTok Share Kit returns to
- * https://aveditorserver.vercel.app/tiktok/callback, which iOS hands to the
- * app only when this file lists the app and path.
+ * Apple universal links for the iOS app. TikTok returns to
+ * https://easyclip.coinpang.org/tiktok/callback, which iOS hands to the
+ * app only when this file lists the app and path (and the app lists the
+ * domain under Associated Domains).
  */
 const APP_ID = "NTCK5U8AWD.com.smartcompany.aveditor";
 

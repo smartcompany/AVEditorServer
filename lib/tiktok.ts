@@ -8,7 +8,10 @@
  * Env: TIKTOK_CLIENT_KEY (sandbox `sb…` or production `aw…`),
  *      TIKTOK_CLIENT_SECRET (the secret of that same key).
  */
-export const TIKTOK_REDIRECT_URI = "https://aveditorserver.vercel.app/tiktok/callback";
+/** Must match TikTok Developer Portal + iOS Associated Domains / AASA. */
+export const TIKTOK_REDIRECT_URI =
+  process.env.TIKTOK_REDIRECT_URI?.trim() ||
+  "https://easyclip.coinpang.org/tiktok/callback";
 export const TIKTOK_SCOPES = ["user.info.basic", "video.publish"];
 
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
