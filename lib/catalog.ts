@@ -1,3 +1,17 @@
+export type {
+  TextCompAlign,
+  TextCompDecoration,
+  TextCompDecorationKind,
+  TextCompSlot,
+  TextComposition,
+} from "./text-composition";
+export {
+  compositionSampleText,
+  splitTextToSlots,
+} from "./text-composition";
+import type { TextComposition } from "./text-composition";
+import { compositionSampleText } from "./text-composition";
+
 export type TextStyleStroke = {
   widthFactor: number;
   useAccent?: boolean;
@@ -129,6 +143,11 @@ export type TextTemplatePackItem = {
   animation?: TextEntranceAnimation;
   /** Optional body text applied when the user picks this pack. */
   sampleText?: string;
+  /**
+   * CapCut-like multi-slot layout + vector decorations.
+   * When set, app/dashboard paint composition instead of a single styled string.
+   */
+  composition?: TextComposition;
 };
 
 export type TextTemplatePackCategory = {
@@ -360,7 +379,319 @@ const MORE_EFFECTS: TextTemplatePackItem[] = [
   effect("effect_color_pop", "Color Pop", LOOK.colorPop),
 ];
 
+/** CapCut basic text-template benchmarks (composition = slots + decorations). */
+const CAPCUT_BASIC_TEMPLATES: TextTemplatePackItem[] = [
+  {
+    id: "tpl_daily_vlog",
+    title: "Daily Vlog",
+    kind: "template",
+    downloadSizeBytes: 0,
+    animation: { id: "fade", durationMs: 700 },
+    style: {
+      id: "tpl_daily_vlog",
+      label: "Daily Vlog",
+      fillColor: WHITE,
+      fillUseAccent: false,
+      preferredFontId: "gothicA1",
+    },
+    composition: {
+      align: "center",
+      gapFactor: 0.18,
+      slots: [
+        {
+          id: "eyebrow",
+          role: "eyebrow",
+          defaultText: "BY EASYCLIP",
+          fontSizeFactor: 0.32,
+          fontWeight: 600,
+          letterSpacingEm: 0.18,
+          fillColor: WHITE,
+        },
+        {
+          id: "title",
+          role: "title",
+          defaultText: "Daily Vlog",
+          fontSizeFactor: 1.05,
+          fontWeight: 800,
+          fillColor: WHITE,
+          preferredFontId: "doHyeon",
+        },
+      ],
+      decorations: [
+        {
+          id: "slash",
+          kind: "slash",
+          color: WHITE,
+          slotId: "title",
+          attach: "below",
+          thicknessFactor: 0.045,
+          lengthFactor: 0.55,
+          gapFactor: 0.2,
+        },
+      ],
+    },
+  },
+  {
+    id: "tpl_back",
+    title: "Back",
+    kind: "template",
+    downloadSizeBytes: 0,
+    animation: { id: "slide_up", durationMs: 650 },
+    style: {
+      id: "tpl_back",
+      label: "Back",
+      fillColor: WHITE,
+      fillUseAccent: false,
+      preferredFontId: "blackHanSans",
+      strokes: [
+        { widthFactor: 0.1, useAccent: false, color: BLACK },
+      ],
+    },
+    composition: {
+      align: "center",
+      gapFactor: 0.35,
+      slots: [
+        {
+          id: "title",
+          role: "title",
+          defaultText: "BACK",
+          fontSizeFactor: 1.35,
+          fontWeight: 900,
+          letterSpacingEm: 0.06,
+          fillColor: WHITE,
+          preferredFontId: "blackHanSans",
+        },
+      ],
+      decorations: [
+        {
+          id: "arrow",
+          kind: "chevron_down",
+          color: 0xffb0b0b0,
+          slotId: "title",
+          attach: "above",
+          widthFactor: 0.9,
+          heightFactor: 0.55,
+          gapFactor: 0.15,
+        },
+      ],
+    },
+  },
+  {
+    id: "tpl_trending_now",
+    title: "Trending Now",
+    kind: "template",
+    downloadSizeBytes: 0,
+    animation: { id: "slide_up", durationMs: 550 },
+    style: {
+      id: "tpl_trending_now",
+      label: "Trending Now",
+      fillColor: WHITE,
+      fillUseAccent: false,
+      preferredFontId: "blackHanSans",
+    },
+    composition: {
+      align: "start",
+      gapFactor: 0.08,
+      slots: [
+        {
+          id: "line1",
+          role: "title",
+          defaultText: "TRENDING",
+          fontSizeFactor: 0.95,
+          fontWeight: 900,
+          fillColor: WHITE,
+          align: "start",
+        },
+        {
+          id: "line2",
+          role: "title",
+          defaultText: "NOW",
+          fontSizeFactor: 0.95,
+          fontWeight: 900,
+          fillColor: WHITE,
+          align: "start",
+        },
+      ],
+      decorations: [
+        {
+          id: "accent",
+          kind: "bar_v",
+          color: 0xff2dd4bf,
+          attach: "left",
+          thicknessFactor: 0.22,
+          lengthFactor: 1,
+          gapFactor: 0.28,
+        },
+        {
+          id: "underline",
+          kind: "rule",
+          color: WHITE,
+          slotId: "line2",
+          attach: "below",
+          thicknessFactor: 0.04,
+          lengthFactor: 1,
+          gapFactor: 0.12,
+        },
+      ],
+    },
+  },
+  {
+    id: "tpl_bold_brave",
+    title: "Bold Brave",
+    kind: "template",
+    downloadSizeBytes: 0,
+    animation: { id: "typewriter", durationMs: 1100, staggerBy: "line" },
+    style: {
+      id: "tpl_bold_brave",
+      label: "Bold Brave",
+      fillColor: WHITE,
+      fillUseAccent: false,
+      preferredFontId: "notoSansKr",
+    },
+    composition: {
+      align: "start",
+      gapFactor: 0.12,
+      slots: [
+        {
+          id: "a",
+          role: "body",
+          defaultText: "Bold.",
+          fontSizeFactor: 0.85,
+          fontWeight: 600,
+          fillColor: WHITE,
+          align: "start",
+        },
+        {
+          id: "b",
+          role: "body",
+          defaultText: "Brave.",
+          fontSizeFactor: 0.85,
+          fontWeight: 500,
+          italic: true,
+          fillColor: WHITE,
+          align: "start",
+          dxFactor: 0.55,
+        },
+        {
+          id: "c",
+          role: "body",
+          defaultText: "Beautiful.",
+          fontSizeFactor: 0.9,
+          fontWeight: 700,
+          fillColor: WHITE,
+          align: "start",
+        },
+      ],
+    },
+  },
+  {
+    id: "tpl_title_simple",
+    title: "Title Simple",
+    kind: "template",
+    downloadSizeBytes: 0,
+    animation: { id: "fade", durationMs: 600 },
+    style: {
+      id: "tpl_title_simple",
+      label: "Title Simple",
+      fillColor: WHITE,
+      fillUseAccent: false,
+      preferredFontId: "gothicA1",
+    },
+    composition: {
+      align: "start",
+      gapFactor: 0.22,
+      slots: [
+        {
+          id: "title",
+          role: "title",
+          defaultText: "TITLE SIMPLE",
+          fontSizeFactor: 0.9,
+          fontWeight: 800,
+          fillColor: WHITE,
+          align: "start",
+        },
+        {
+          id: "subtitle",
+          role: "subtitle",
+          defaultText: "sub heading",
+          fontSizeFactor: 0.42,
+          fontWeight: 500,
+          fillColor: INK,
+          align: "start",
+          boxFillColor: WHITE,
+          boxPadHFactor: 0.35,
+          boxPadVFactor: 0.28,
+        },
+      ],
+      decorations: [
+        {
+          id: "orange",
+          kind: "bar_v",
+          color: 0xffff8a00,
+          attach: "right",
+          thicknessFactor: 0.2,
+          lengthFactor: 1,
+          gapFactor: 0.3,
+        },
+      ],
+    },
+  },
+  {
+    id: "tpl_archive_july",
+    title: "Archive",
+    kind: "template",
+    downloadSizeBytes: 0,
+    animation: { id: "fade", durationMs: 800 },
+    style: {
+      id: "tpl_archive_july",
+      label: "Archive",
+      fillColor: WHITE,
+      fillUseAccent: false,
+      preferredFontId: "blackHanSans",
+    },
+    composition: {
+      align: "center",
+      gapFactor: 0.2,
+      slots: [
+        {
+          id: "title",
+          role: "title",
+          defaultText: "ARCHIVE OF JULY",
+          fontSizeFactor: 0.78,
+          fontWeight: 900,
+          fillColor: WHITE,
+          preferredFontId: "blackHanSans",
+        },
+        {
+          id: "subtitle",
+          role: "subtitle",
+          defaultText: "short memory",
+          fontSizeFactor: 0.38,
+          fontWeight: 400,
+          italic: true,
+          letterSpacingEm: 0.12,
+          fillColor: WHITE,
+          preferredFontId: "gaegu",
+        },
+      ],
+      decorations: [
+        {
+          id: "divider",
+          kind: "rule",
+          color: WHITE,
+          slotId: "title",
+          attach: "below",
+          thicknessFactor: 0.035,
+          lengthFactor: 0.85,
+          gapFactor: 0.18,
+        },
+      ],
+    },
+  },
+];
+
 const MORE_TEMPLATES: TextTemplatePackItem[] = [
+  ...CAPCUT_BASIC_TEMPLATES,
   template("pack_subtitle", "Subtitle", { id: "fade", durationMs: 400 }, LOOK.caption),
   template("pack_typing", "Typing", { id: "typewriter", durationMs: 1000 }, {
     fillColor: WHITE,
@@ -662,10 +993,13 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 0;
+export const TEXT_CATALOG_SEED_VERSION = 1;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;
+  if (item.composition?.slots?.length) {
+    return { ...item, sampleText: compositionSampleText(item.composition) };
+  }
   return {
     ...item,
     sampleText:

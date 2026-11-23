@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
+  TextComposition,
   TextEntranceAnimation,
   TextStyleTemplate,
   TextTemplatePackCatalog,
@@ -12,6 +13,7 @@ import {
   DEFAULT_EFFECT_SAMPLE_TEXT,
   DEFAULT_TEMPLATE_SAMPLE_TEXT,
   TYPEWRITER_ANIMATION_DEFAULTS,
+  compositionSampleText,
 } from "@/lib/catalog";
 import { ui } from "./ui";
 
@@ -602,11 +604,19 @@ export default function TextTab({ initialCatalog, view }: Props) {
 
         {selected && preview ? (
           <section style={ui.panel}>
-            <TextPreview
-              item={selected}
-              accent={accent}
-              progress={view === "templates" ? playProgress : 1}
-            />
+            {selected.composition?.slots?.length ? (
+              <CompositionPreview
+                item={selected}
+                accent={accent}
+                progress={view === "templates" ? playProgress : 1}
+              />
+            ) : (
+              <TextPreview
+                item={selected}
+                accent={accent}
+                progress={view === "templates" ? playProgress : 1}
+              />
+            )}
             {view === "templates" && (
               <div style={styles.transport}>
                 <button type="button" onClick={play} style={ui.btnPrimary}>
@@ -906,6 +916,58 @@ export default function TextTab({ initialCatalog, view }: Props) {
               )}
                 </>
               )}
+              {selected.composition?.slots?.length ? (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <h3 style={ui.h3}>Composition 슬롯</h3>
+                  <p style={ui.muted}>
+                    줄바꿈으로 슬롯이 매핑됩니다. 대시보드·앱이 같은 composition JSON을 그립니다.
+                  </p>
+                  {selected.composition.slots.map((slot, idx) => (
+                    <label key={slot.id} style={{ ...ui.fieldLabel, marginBottom: 8 }}>
+                      슬롯 {slot.id} ({slot.role ?? "body"})
+                      <input
+                        value={slot.defaultText}
+                        onChange={(e) => {
+                          const slots = selected.composition!.slots.map((s, i) =>
+                            i === idx ? { ...s, defaultText: e.target.value } : s,
+                          );
+                          const composition: TextComposition = {
+                            ...selected.composition!,
+                            slots,
+                          };
+                          patchSelected({
+                            composition,
+                            sampleText: compositionSampleText(composition),
+                          });
+                        }}
+                        style={ui.input}
+                      />
+                    </label>
+                  ))}
+                  <label style={{ ...ui.fieldLabel, marginTop: 8 }}>
+                    composition JSON
+                    <textarea
+                      value={JSON.stringify(selected.composition, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          const composition = JSON.parse(e.target.value) as TextComposition;
+                          if (!Array.isArray(composition.slots)) return;
+                          patchSelected({
+                            composition,
+                            sampleText: compositionSampleText(composition),
+                          });
+                        } catch {
+                          /* live typing */
+                        }
+                      }}
+                      rows={14}
+                      spellCheck={false}
+                      style={{ ...ui.jsonArea, minHeight: 220, fontFamily: "ui-monospace, monospace" }}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <>
               <label style={{ ...ui.fieldLabel, gridColumn: "1 / -1" }}>
                 샘플 본문 (sampleText)
                 <textarea
@@ -931,6 +993,8 @@ export default function TextTab({ initialCatalog, view }: Props) {
               <p style={{ ...ui.sub, margin: 0, gridColumn: "1 / -1" }}>
                 앱 텍스트/템플릿 패널 타일에 그대로 표시됩니다.
               </p>
+                </>
+              )}
               <label style={ui.fieldLabel}>
                 기본 글꼴 id (preferredFontId)
                 <input
@@ -1011,6 +1075,163 @@ const styles: Record<string, CSSProperties> = {
 /** Split sample into visual lines (keep empty trailing line if text ends with \\n). */
 function sampleLines(text: string): string[] {
   return text.split("\n");
+}
+
+function argbHex(n: number | undefined, fallback = "#ffffff"): string {
+  if (n == null) return fallback;
+  const a = (n >>> 24) & 0xff;
+  const r = (n >>> 16) & 0xff;
+  const g = (n >>> 8) & 0xff;
+  const b = n & 0xff;
+  if (a < 255) {
+    return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
+  }
+  return `#${[r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** CapCut-like composition preview (slots + decorations). */
+function CompositionPreview({
+  item,
+  accent,
+  progress,
+}: {
+  item: TextTemplatePackItem;
+  accent: string;
+  progress: number;
+}) {
+  const composition = item.composition!;
+  const fontPx = 28;
+  const gap = fontPx * (composition.gapFactor ?? 0.16);
+  const align = composition.align ?? "center";
+  const frame = entranceFrame(
+    item.animation?.id,
+    Array.from(compositionSampleText(composition)),
+    progress,
+    fontPx,
+    item.animation,
+  );
+
+  const leftBar = composition.decorations?.find((d) => d.kind === "bar_v" && d.attach === "left");
+  const rightBar = composition.decorations?.find((d) => d.kind === "bar_v" && d.attach === "right");
+  const chevron = composition.decorations?.find((d) => d.kind === "chevron_down");
+
+  return (
+    <div style={styles.previewStage}>
+      <div
+        style={{
+          display: "inline-flex",
+          flexDirection: "row",
+          alignItems: "stretch",
+          gap: fontPx * (leftBar?.gapFactor ?? 0.28),
+          opacity: frame.layerOpacity,
+          transform: `translateY(${frame.layerDy}px)`,
+        }}
+      >
+        {leftBar && (
+          <div
+            style={{
+              width: fontPx * (leftBar.thicknessFactor ?? 0.22),
+              background: argbHex(leftBar.color, "#2dd4bf"),
+              borderRadius: 2,
+              alignSelf: "stretch",
+              minHeight: 40,
+            }}
+          />
+        )}
+        <div
+          style={{
+            display: "inline-flex",
+            flexDirection: "column",
+            alignItems:
+              align === "start" ? "flex-start" : align === "end" ? "flex-end" : "center",
+            gap,
+            position: "relative",
+          }}
+        >
+          {chevron && (
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: `${fontPx * 0.35}px solid transparent`,
+                borderRight: `${fontPx * 0.35}px solid transparent`,
+                borderTop: `${fontPx * 0.4}px solid ${argbHex(chevron.color, "#b0b0b0")}`,
+                marginBottom: fontPx * 0.05,
+              }}
+            />
+          )}
+          {composition.slots.map((slot) => {
+            const fs = fontPx * (slot.fontSizeFactor ?? 1);
+            const below = composition.decorations?.find(
+              (d) =>
+                d.slotId === slot.id &&
+                (d.attach === "below" || !d.attach) &&
+                (d.kind === "rule" || d.kind === "slash"),
+            );
+            const color = slot.fillColor != null ? argbHex(slot.fillColor) : accent;
+            return (
+              <div
+                key={slot.id}
+                style={{
+                  marginLeft: (slot.dxFactor ?? 0) * fontPx,
+                  textAlign: slot.align ?? align,
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    fontSize: fs,
+                    fontWeight: slot.fontWeight ?? 700,
+                    fontStyle: slot.italic ? "italic" : "normal",
+                    letterSpacing: `${(slot.letterSpacingEm ?? 0) * fs}px`,
+                    color: slot.boxFillColor != null ? argbHex(slot.fillColor, "#111") : color,
+                    lineHeight: 1.1,
+                    whiteSpace: "pre",
+                    padding:
+                      slot.boxFillColor != null
+                        ? `${fs * (slot.boxPadVFactor ?? 0.28)}px ${fs * (slot.boxPadHFactor ?? 0.35)}px`
+                        : undefined,
+                    background: slot.boxFillColor != null ? argbHex(slot.boxFillColor) : undefined,
+                  }}
+                >
+                  {slot.defaultText}
+                </span>
+                {below && (
+                  <div
+                    style={{
+                      marginTop: fs * (below.gapFactor ?? 0.15),
+                      height: below.kind === "slash" ? 0 : Math.max(1, fs * (below.thicknessFactor ?? 0.04)),
+                      width: `${(below.lengthFactor ?? 1) * 100}%`,
+                      background: below.kind === "slash" ? "transparent" : argbHex(below.color),
+                      borderTop:
+                        below.kind === "slash"
+                          ? `${Math.max(1, fs * (below.thicknessFactor ?? 0.04))}px solid ${argbHex(below.color)}`
+                          : undefined,
+                      transform: below.kind === "slash" ? "rotate(-8deg)" : undefined,
+                      marginLeft: "auto",
+                      marginRight: "auto",
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {rightBar && (
+          <div
+            style={{
+              width: fontPx * (rightBar.thicknessFactor ?? 0.2),
+              background: argbHex(rightBar.color, "#ff8a00"),
+              borderRadius: 2,
+              alignSelf: "stretch",
+              minHeight: 40,
+              marginLeft: fontPx * (rightBar.gapFactor ?? 0.3),
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 /**
