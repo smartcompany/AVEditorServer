@@ -78,7 +78,53 @@ export default function PrivacyPage() {
         </ul>
       </Section>
 
-      <Section title="3. Anonymous usage analytics">
+      <Section title="3. Data protection mechanisms for Google user data">
+        <p>
+          Security procedures are in place to protect the confidentiality of your
+          Google user data. We use encryption and platform security controls to
+          protect this information, as follows:
+        </p>
+        <ul>
+          <li>
+            <strong>Encryption in transit.</strong> All communication with Google
+            APIs (including YouTube upload and OAuth token exchange) uses HTTPS /
+            TLS. Traffic between the app and our servers also uses HTTPS / TLS.
+          </li>
+          <li>
+            <strong>On-device secure storage.</strong> Google Sign-In credentials and
+            session markers are stored only on your device using the platform secure
+            store (iOS Keychain / Android Keystore via encrypted secure storage). We
+            do not store Google access tokens, refresh tokens, or account
+            identifiers on our servers.
+          </li>
+          <li>
+            <strong>Access control.</strong> Google user data is accessed only after
+            you grant OAuth 2.0 consent, and only for the{" "}
+            <code>youtube.upload</code> scope needed to upload to your own channel.
+            Our backend has no credentials that can call Google APIs on your behalf.
+          </li>
+          <li>
+            <strong>Data minimization.</strong> Videos and projects remain on your
+            device. We request the narrowest Google scope required for upload and do
+            not collect Google profile, email, channel metadata, or video content
+            onto our servers.
+          </li>
+          <li>
+            <strong>No human access or secondary use.</strong> Our staff and systems
+            do not read, copy, or process Google user data obtained through Google
+            APIs. We do not sell Google user data, use it for advertising, credit
+            decisions, or AI / machine-learning model training.
+          </li>
+          <li>
+            <strong>Deletion and revocation.</strong> Signing out of YouTube in the
+            app clears the local session marker. You can revoke the app&apos;s Google
+            access at any time in Google Account → Third-party access, which
+            invalidates tokens for further API calls.
+          </li>
+        </ul>
+      </Section>
+
+      <Section title="4. Anonymous usage analytics">
         <p>
           To improve the product, the app may send anonymous data to our server: a
           random install ID, platform (iOS/Android), app version, event names (for
@@ -89,7 +135,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="4. Advertising">
+      <Section title="5. Advertising">
         <p>
           If a free user chooses to watch an ad to use a Pro effect once, a Google
           AdMob ad may be shown. AdMob may use device information such as an
@@ -97,11 +143,13 @@ export default function PrivacyPage() {
           <a href="https://policies.google.com/technologies/ads" style={link}>
             Google advertising policies
           </a>
-          . You can turn off ad personalization in your device settings.
+          . You can turn off ad personalization in your device settings. AdMob
+          advertising does not receive Google user data obtained through the YouTube
+          OAuth scopes.
         </p>
       </Section>
 
-      <Section title="5. Payments (Pro subscription)">
+      <Section title="6. Payments (Pro subscription)">
         <p>
           Subscriptions are processed by the App Store or Google Play; the app does
           not receive card or other payment details. Our server verifies store
@@ -110,7 +158,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="6. Effect / music catalog and music search">
+      <Section title="7. Effect / music catalog and music search">
         <p>
           The app downloads transition effects, text templates, and music catalogs
           from our server. When you search for music, your search query is sent to
@@ -119,22 +167,27 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="7. Retention and deletion">
+      <Section title="8. Retention and deletion">
         <p>
           Videos and projects remain on your device and are removed when you delete
-          them in the app or uninstall the app. To request deletion of anonymous
-          usage statistics, contact us below.
+          them in the app or uninstall the app. Google OAuth tokens are not retained
+          on our servers. To request deletion of anonymous usage statistics, contact
+          us below. See also our{" "}
+          <a href="/data-deletion" style={link}>
+            Data deletion
+          </a>{" "}
+          page.
         </p>
       </Section>
 
-      <Section title="8. Children">
+      <Section title="9. Children">
         <p>
           The app is not directed at children under 14, and we do not knowingly
           collect personal information from children.
         </p>
       </Section>
 
-      <Section title="9. Changes and contact">
+      <Section title="10. Changes and contact">
         <p>
           If this policy changes, we will post the update on this page and revise
           the effective date. Contact: {contact}
