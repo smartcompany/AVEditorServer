@@ -126,7 +126,20 @@ export type TextTemplatePackCatalog = {
   /** Absolute base URL Flutter should resolve relative lottieUrl against. */
   baseUrl: string;
   categories: TextTemplatePackCategory[];
+  /**
+   * App grid tile preview for static text effects (when an item has no
+   * sampleText). Editable in the dashboard.
+   */
+  effectPreviewText?: string;
+  /**
+   * App grid tile preview for text templates (when an item has no
+   * sampleText). Editable in the dashboard.
+   */
+  templatePreviewText?: string;
 };
+
+export const DEFAULT_EFFECT_PREVIEW_TEXT = "Aa";
+export const DEFAULT_TEMPLATE_PREVIEW_TEXT = "Hello\nWorld";
 
 
 // ---------------------------------------------------------------------------
@@ -637,6 +650,8 @@ export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
     version: TEXT_CATALOG_SEED_VERSION,
     baseUrl: normalized,
     categories: PACK_CATEGORIES,
+    effectPreviewText: DEFAULT_EFFECT_PREVIEW_TEXT,
+    templatePreviewText: DEFAULT_TEMPLATE_PREVIEW_TEXT,
   };
 }
 

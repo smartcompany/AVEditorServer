@@ -61,6 +61,10 @@ export function mergeSeedIntoCatalog(
     categories,
     // Keep stored version for dashboard save churn; seed merge is additive.
     version: Math.max(stored.version, seed.version),
+    effectPreviewText:
+      stored.effectPreviewText?.trim() || seed.effectPreviewText,
+    templatePreviewText:
+      stored.templatePreviewText?.trim() || seed.templatePreviewText,
   };
 }
 

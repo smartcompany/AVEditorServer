@@ -7,7 +7,11 @@ import type {
   TextTemplatePackCatalog,
   TextTemplatePackItem,
 } from "@/lib/catalog";
-import { CRAWL_ANIMATION_DEFAULTS } from "@/lib/catalog";
+import {
+  CRAWL_ANIMATION_DEFAULTS,
+  DEFAULT_EFFECT_PREVIEW_TEXT,
+  DEFAULT_TEMPLATE_PREVIEW_TEXT,
+} from "@/lib/catalog";
 import { ui } from "./ui";
 
 type Props = {
@@ -473,6 +477,47 @@ export default function TextTab({ initialCatalog, view }: Props) {
       </div>
       {status && <p style={ui.status}>{status}</p>}
 
+      <div
+        style={{
+          ...ui.panel,
+          marginBottom: 16,
+          padding: 14,
+          display: "grid",
+          gap: 10,
+          gridTemplateColumns: "1fr",
+        }}
+      >
+        <label style={ui.fieldLabel}>
+          {view === "templates"
+            ? "앱 템플릿 타일 미리보기 문구 (templatePreviewText)"
+            : "앱 효과 타일 미리보기 문구 (effectPreviewText)"}
+          <textarea
+            value={
+              view === "templates"
+                ? (catalog.templatePreviewText ?? DEFAULT_TEMPLATE_PREVIEW_TEXT)
+                : (catalog.effectPreviewText ?? DEFAULT_EFFECT_PREVIEW_TEXT)
+            }
+            onChange={(e) => {
+              const value = e.target.value;
+              setCatalog((prev) => ({
+                ...prev,
+                ...(view === "templates"
+                  ? { templatePreviewText: value }
+                  : { effectPreviewText: value }),
+              }));
+              setDirty(true);
+            }}
+            rows={view === "templates" ? 3 : 2}
+            spellCheck={false}
+            style={{ ...ui.jsonArea, minHeight: view === "templates" ? 72 : 52 }}
+          />
+        </label>
+        <p style={{ ...ui.sub, margin: 0 }}>
+          아이템에 sampleText가 있으면 타일에는 sampleText가 우선합니다. 여기
+          값은 공통 폴백입니다.
+        </p>
+      </div>
+
       <div style={ui.split}>
         <aside style={ui.sidebar}>
           {viewCategories.map((cat) => (
@@ -523,6 +568,11 @@ export default function TextTab({ initialCatalog, view }: Props) {
               item={selected}
               accent={accent}
               progress={view === "templates" ? playProgress : 1}
+              catalogPreviewText={
+                view === "templates"
+                  ? (catalog.templatePreviewText ?? DEFAULT_TEMPLATE_PREVIEW_TEXT)
+                  : (catalog.effectPreviewText ?? DEFAULT_EFFECT_PREVIEW_TEXT)
+              }
             />
             {view === "templates" && (
               <div style={styles.transport}>
@@ -749,24 +799,27 @@ export default function TextTab({ initialCatalog, view }: Props) {
                       style={ui.input}
                     />
                   </label>
-                  <label style={{ ...ui.fieldLabel, gridColumn: "1 / -1" }}>
-                    샘플 본문 (sampleText)
-                    <textarea
-                      value={selected.sampleText ?? ""}
-                      onChange={(e) =>
-                        patchSelected({
-                          sampleText: e.target.value || undefined,
-                        })
-                      }
-                      rows={8}
-                      spellCheck={false}
-                      style={{ ...ui.jsonArea, minHeight: 140 }}
-                    />
-                  </label>
                 </>
               )}
                 </>
               )}
+              <label style={{ ...ui.fieldLabel, gridColumn: "1 / -1" }}>
+                아이템 샘플 문구 (sampleText · 타일/적용 시 우선)
+                <textarea
+                  value={selected.sampleText ?? ""}
+                  onChange={(e) =>
+                    patchSelected({
+                      sampleText: e.target.value || undefined,
+                    })
+                  }
+                  rows={selected.animation?.id === "crawl" ? 8 : 3}
+                  spellCheck={false}
+                  style={{
+                    ...ui.jsonArea,
+                    minHeight: selected.animation?.id === "crawl" ? 140 : 72,
+                  }}
+                />
+              </label>
               <label style={ui.fieldLabel}>
                 기본 글꼴 id (preferredFontId)
                 <input
@@ -854,16 +907,20 @@ function TextPreview({
   item,
   accent,
   progress,
+  catalogPreviewText,
 }: {
   item: TextTemplatePackItem;
   accent: string;
   progress: number;
+  catalogPreviewText: string;
 }) {
   const isCrawl = item.animation?.id === "crawl";
   const fontPx = isCrawl ? 18 : 34;
-  const text = isCrawl
-    ? (item.sampleText?.trim() || item.title || "Episode crawl…")
-    : item.title || "Hello";
+  const text =
+    item.sampleText?.trim() ||
+    catalogPreviewText.trim() ||
+    item.title ||
+    (isCrawl ? "Hello" : "Aa");
   const glyphs = Array.from(text);
   const css = previewCss(item.style, accent, fontPx);
   const frame = entranceFrame(
