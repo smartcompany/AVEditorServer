@@ -25,20 +25,29 @@ function withBaseUrl(
 /**
  * Merge seed items missing from a saved catalog so code-side templates
  * (e.g. Star Crawl) still appear after a dashboard save, without wiping edits.
- * Storage item wins on id collision.
+ * Storage item wins on id collision. Seed also fills empty sampleText.
  */
 export function mergeSeedIntoCatalog(
   stored: TextTemplatePackCatalog,
   seed: TextTemplatePackCatalog,
 ): TextTemplatePackCatalog {
-  const storedIds = new Set<string>();
-  for (const category of stored.categories) {
-    for (const item of category.items) storedIds.add(item.id);
+  const seedById = new Map<string, TextTemplatePackItem>();
+  for (const category of seed.categories) {
+    for (const item of category.items) seedById.set(item.id, item);
   }
 
+  const storedIds = new Set<string>();
   const categories = stored.categories.map((category) => ({
     ...category,
-    items: [...category.items],
+    items: category.items.map((item) => {
+      storedIds.add(item.id);
+      const seedItem = seedById.get(item.id);
+      if (item.sampleText?.trim()) return item;
+      if (seedItem?.sampleText?.trim()) {
+        return { ...item, sampleText: seedItem.sampleText };
+      }
+      return item;
+    }),
   }));
 
   for (const seedCategory of seed.categories) {
@@ -61,10 +70,6 @@ export function mergeSeedIntoCatalog(
     categories,
     // Keep stored version for dashboard save churn; seed merge is additive.
     version: Math.max(stored.version, seed.version),
-    effectPreviewText:
-      stored.effectPreviewText?.trim() || seed.effectPreviewText,
-    templatePreviewText:
-      stored.templatePreviewText?.trim() || seed.templatePreviewText,
   };
 }
 

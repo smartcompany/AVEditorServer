@@ -126,20 +126,12 @@ export type TextTemplatePackCatalog = {
   /** Absolute base URL Flutter should resolve relative lottieUrl against. */
   baseUrl: string;
   categories: TextTemplatePackCategory[];
-  /**
-   * App grid tile preview for static text effects (when an item has no
-   * sampleText). Editable in the dashboard.
-   */
-  effectPreviewText?: string;
-  /**
-   * App grid tile preview for text templates (when an item has no
-   * sampleText). Editable in the dashboard.
-   */
-  templatePreviewText?: string;
 };
 
-export const DEFAULT_EFFECT_PREVIEW_TEXT = "Aa";
-export const DEFAULT_TEMPLATE_PREVIEW_TEXT = "Hello\nWorld";
+/** Default tile / apply sample for static text effects. */
+export const DEFAULT_EFFECT_SAMPLE_TEXT = "Aa";
+/** Default tile / apply sample for text templates (multi-line). */
+export const DEFAULT_TEMPLATE_SAMPLE_TEXT = "Hello\nWorld";
 
 
 // ---------------------------------------------------------------------------
@@ -161,6 +153,7 @@ function effect(id: string, title: string, style: Omit<TextStyleTemplate, "id" |
     premium: false,
     downloadSizeBytes: 0,
     style: { id, label: title, fillUseAccent: false, ...style },
+    sampleText: DEFAULT_EFFECT_SAMPLE_TEXT,
   };
 }
 
@@ -179,7 +172,7 @@ function template(
     downloadSizeBytes: 0,
     animation,
     style: { id, label: title, fillUseAccent: false, ...style },
-    ...(extras?.sampleText ? { sampleText: extras.sampleText } : {}),
+    sampleText: extras?.sampleText?.trim() || DEFAULT_TEMPLATE_SAMPLE_TEXT,
   };
 }
 
@@ -644,14 +637,26 @@ for (const category of PACK_CATEGORIES) {
 /** Seed (code) catalog version. Bump when the seed itself changes. */
 export const TEXT_CATALOG_SEED_VERSION = 0;
 
+function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
+  if (item.sampleText?.trim()) return item;
+  return {
+    ...item,
+    sampleText:
+      item.kind === "template"
+        ? DEFAULT_TEMPLATE_SAMPLE_TEXT
+        : DEFAULT_EFFECT_SAMPLE_TEXT,
+  };
+}
+
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return {
     version: TEXT_CATALOG_SEED_VERSION,
     baseUrl: normalized,
-    categories: PACK_CATEGORIES,
-    effectPreviewText: DEFAULT_EFFECT_PREVIEW_TEXT,
-    templatePreviewText: DEFAULT_TEMPLATE_PREVIEW_TEXT,
+    categories: PACK_CATEGORIES.map((category) => ({
+      ...category,
+      items: category.items.map(withDefaultSampleText),
+    })),
   };
 }
 
