@@ -65,6 +65,12 @@ export type TextEntranceAnimation = {
    */
   staggerOverlap?: number;
   /**
+   * Typewriter only — `glyph` staggers every character; `line` finishes each
+   * line before the next (Hello… then World…). `auto` uses `line` when the
+   * sample has a newline. Default `auto`.
+   */
+  staggerBy?: "glyph" | "line" | "auto";
+  /**
    * Crawl only — degrees of classic “bottom nearer / top into distance” tilt.
    * Flutter applies the platform sign; dashboard CSS uses this value as-is.
    * Default 54.
@@ -81,7 +87,8 @@ export type TextEntranceAnimation = {
 /** Defaults mirrored by the Flutter client when fields are omitted. */
 export const TYPEWRITER_ANIMATION_DEFAULTS = {
   staggerOverlap: 0.55,
-} as const;
+  staggerBy: "auto" as const,
+};
 
 export const CRAWL_ANIMATION_DEFAULTS = {
   tiltDeg: 54,
@@ -554,7 +561,11 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
         kind: "template",
         premium: false,
         downloadSizeBytes: 0,
-        animation: { id: "typewriter", durationMs: 900 },
+        animation: {
+          id: "typewriter",
+          durationMs: 900,
+          staggerBy: "line",
+        },
         style: {
           id: "pack_journal",
           label: "Journal",

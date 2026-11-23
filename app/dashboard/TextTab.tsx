@@ -58,6 +58,60 @@ function staggeredOpacities(
   });
 }
 
+function staggerByLine(text: string, staggerBy?: string): boolean {
+  if (staggerBy === "line") return true;
+  if (staggerBy === "glyph") return false;
+  return text.includes("\n");
+}
+
+/** Finish each line before the next — mirrors Flutter `_staggeredByLine`. */
+function staggeredOpacitiesByLine(
+  glyphs: string[],
+  progress: number,
+  hardCut = true,
+  overlap = TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
+): number[] {
+  const out = glyphs.map(() => 0);
+  if (glyphs.length === 0) return out;
+  const lines: number[][] = [];
+  let current: number[] = [];
+  for (let i = 0; i < glyphs.length; i++) {
+    current.push(i);
+    if (glyphs[i] === "\n") {
+      lines.push(current);
+      current = [];
+    }
+  }
+  if (current.length) lines.push(current);
+  if (!lines.length) return out;
+
+  const scaled = Math.min(1, Math.max(0, progress)) * lines.length;
+  const active = Math.min(lines.length - 1, Math.floor(scaled));
+  const localT = Math.min(1, Math.max(0, scaled - active));
+
+  for (let li = 0; li < lines.length; li++) {
+    const idxs = lines[li];
+    if (li < active) {
+      for (const i of idxs) out[i] = 1;
+      continue;
+    }
+    if (li > active) continue;
+    const content = idxs.filter((i) => glyphs[i] !== "\n");
+    if (!content.length) {
+      for (const i of idxs) out[i] = 1;
+      continue;
+    }
+    const inner = staggeredOpacities(content.length, localT, hardCut, overlap);
+    content.forEach((glyphIndex, k) => {
+      out[glyphIndex] = inner[k] ?? 0;
+    });
+    for (const i of idxs) {
+      if (glyphs[i] === "\n") out[i] = 1;
+    }
+  }
+  return out;
+}
+
 type EntranceFrame = {
   glyphOpacity: number[] | null;
   layerOpacity: number;
@@ -69,12 +123,13 @@ type EntranceFrame = {
 
 function entranceFrame(
   animationId: string | undefined,
-  glyphCount: number,
+  glyphs: string[],
   progress: number,
   fontPx: number,
   animation?: TextEntranceAnimation,
 ): EntranceFrame {
   const t = Math.min(1, Math.max(0, progress));
+  const glyphCount = glyphs.length;
   if (animationId === "crawl") {
     const tiltDeg = animation?.tiltDeg ?? CRAWL_ANIMATION_DEFAULTS.tiltDeg;
     const startF =
@@ -98,17 +153,22 @@ function entranceFrame(
       const eased = easeOutCubic(t);
       return { glyphOpacity: null, layerOpacity: eased, layerDy: (1 - eased) * fontPx * 0.45 };
     }
-    case "typewriter":
+    case "typewriter": {
+      const overlap =
+        animation?.staggerOverlap ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap;
+      const text = glyphs.join("");
+      const byLine = staggerByLine(
+        text,
+        animation?.staggerBy ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerBy,
+      );
       return {
-        glyphOpacity: staggeredOpacities(
-          glyphCount,
-          t,
-          true,
-          animation?.staggerOverlap ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
-        ),
+        glyphOpacity: byLine
+          ? staggeredOpacitiesByLine(glyphs, t, true, overlap)
+          : staggeredOpacities(glyphCount, t, true, overlap),
         layerOpacity: 1,
         layerDy: 0,
       };
+    }
     case "fade": {
       // Whole line fades in together (same as the app's evaluateTextEntrance).
       const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -636,6 +696,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
                         ...(id === "crawl"
                           ? {
                               staggerOverlap: undefined,
+                              staggerBy: undefined,
                               tiltDeg:
                                 selected.animation?.tiltDeg ??
                                 CRAWL_ANIMATION_DEFAULTS.tiltDeg,
@@ -654,6 +715,9 @@ export default function TextTab({ initialCatalog, view }: Props) {
                                 staggerOverlap:
                                   selected.animation?.staggerOverlap ??
                                   TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
+                                staggerBy:
+                                  selected.animation?.staggerBy ??
+                                  TYPEWRITER_ANIMATION_DEFAULTS.staggerBy,
                                 tiltDeg: undefined,
                                 perspective: undefined,
                                 scrollStartFactor: undefined,
@@ -661,6 +725,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
                               }
                             : {
                                 staggerOverlap: undefined,
+                                staggerBy: undefined,
                                 tiltDeg: undefined,
                                 perspective: undefined,
                                 scrollStartFactor: undefined,
@@ -699,29 +764,57 @@ export default function TextTab({ initialCatalog, view }: Props) {
                 />
               </label>
               {selected.animation?.id === "typewriter" && (
-                <label style={ui.fieldLabel}>
-                  글자 오버랩 (staggerOverlap)
-                  <input
-                    type="number"
-                    step={0.05}
-                    min={0}
-                    max={0.95}
-                    value={
-                      selected.animation?.staggerOverlap ??
-                      TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap
-                    }
-                    onChange={(e) =>
-                      selected.animation &&
-                      patchSelected({
-                        animation: {
-                          ...selected.animation,
-                          staggerOverlap: Number(e.target.value),
-                        },
-                      })
-                    }
-                    style={ui.input}
-                  />
-                </label>
+                <>
+                  <label style={ui.fieldLabel}>
+                    글자 오버랩 (staggerOverlap)
+                    <input
+                      type="number"
+                      step={0.05}
+                      min={0}
+                      max={0.95}
+                      value={
+                        selected.animation?.staggerOverlap ??
+                        TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            staggerOverlap: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    진행 단위 (staggerBy)
+                    <select
+                      value={
+                        selected.animation?.staggerBy ??
+                        TYPEWRITER_ANIMATION_DEFAULTS.staggerBy
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            staggerBy: e.target.value as
+                              | "glyph"
+                              | "line"
+                              | "auto",
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    >
+                      <option value="auto">auto (줄바꿈 있으면 줄 단위)</option>
+                      <option value="line">line (줄 끝난 뒤 다음 줄)</option>
+                      <option value="glyph">glyph (글자 연속)</option>
+                    </select>
+                  </label>
+                </>
               )}
               {selected.animation?.id === "crawl" && (
                 <>
@@ -915,11 +1008,20 @@ const styles: Record<string, CSSProperties> = {
   },
 };
 
+/** Split sample into visual lines (keep empty trailing line if text ends with \\n). */
+function sampleLines(text: string): string[] {
+  return text.split("\n");
+}
+
 /**
  * Text preview. For templates [progress] < 1 plays the app's entrance:
  * typewriter shows glyphs one by one (and reveals the background with them,
  * like the torn-paper fix in the app), fade eases glyphs in, slide_up lifts
  * the whole line while fading in.
+ *
+ * Multiline typewriter is line-sequential (Hello finishes, then World) with
+ * one torn-paper strip per line — a single shared brush box would silhouette
+ * every line at once and read as parallel typing.
  */
 function TextPreview({
   item,
@@ -941,7 +1043,7 @@ function TextPreview({
   const css = previewCss(item.style, accent, fontPx);
   const frame = entranceFrame(
     item.animation?.id,
-    glyphs.length,
+    glyphs,
     progress,
     fontPx,
     item.animation,
@@ -950,20 +1052,14 @@ function TextPreview({
     1 / (item.animation?.perspective ?? CRAWL_ANIMATION_DEFAULTS.perspective),
   );
 
-  let box: CSSProperties = css.box;
-  // Single-line torn-paper grow via clip. Multiline must not use a horizontal
-  // clip — that reveals every line at once (unlike the app's per-glyph paint).
   const multiline = text.includes("\n");
-  if (
-    frame.glyphOpacity &&
-    item.animation?.id === "typewriter" &&
-    item.style.lineBackground &&
-    !multiline
-  ) {
-    const visible = frame.glyphOpacity.filter((o) => o > 0).length;
-    const hidden = 100 - (visible / Math.max(1, glyphs.length)) * 100;
-    box = { ...box, clipPath: `inset(-20% ${hidden}% -20% -20%)` };
-  }
+  const isTypewriter = item.animation?.id === "typewriter";
+  const byLine =
+    isTypewriter &&
+    staggerByLine(
+      text,
+      item.animation?.staggerBy ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerBy,
+    );
 
   if (isCrawl) {
     return (
@@ -981,6 +1077,81 @@ function TextPreview({
         </div>
       </div>
     );
+  }
+
+  // Line-by-line typewriter: each line is its own paper + glyph strip.
+  if (isTypewriter && byLine && multiline && frame.glyphOpacity) {
+    const lines = sampleLines(text);
+    let glyphOffset = 0;
+    return (
+      <div style={styles.previewStage}>
+        <div
+          style={{
+            display: "inline-flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: fontPx * 0.12,
+            opacity: frame.layerOpacity,
+            transform: `translateY(${frame.layerDy}px)`,
+          }}
+        >
+          {lines.map((line, li) => {
+            const lineGlyphs = Array.from(line);
+            const start = glyphOffset;
+            glyphOffset += lineGlyphs.length + (li < lines.length - 1 ? 1 : 0);
+            const opacities = frame.glyphOpacity!.slice(start, start + lineGlyphs.length);
+            const anyVisible = opacities.some((o) => o > 0.01);
+            if (!anyVisible && progress < 1) {
+              return null;
+            }
+            const visibleCount = opacities.filter((o) => o > 0).length;
+            const hidden =
+              lineGlyphs.length === 0
+                ? 0
+                : 100 - (visibleCount / lineGlyphs.length) * 100;
+            const lineBox: CSSProperties = {
+              ...css.box,
+              display: "inline-block",
+              whiteSpace: "pre",
+              textAlign: "center",
+              ...(item.style.lineBackground && lineGlyphs.length > 0
+                ? { clipPath: `inset(-20% ${hidden}% -20% -20%)` }
+                : {}),
+            };
+            return (
+              <span key={li} style={lineBox}>
+                {css.brush && <TornPaper paint={css.brush} />}
+                <span
+                  style={{
+                    ...css.text,
+                    position: "relative",
+                    zIndex: 1,
+                    whiteSpace: "pre",
+                  }}
+                >
+                  {lineGlyphs.map((g, i) => (
+                    <span key={i} style={{ opacity: opacities[i] ?? 0 }}>
+                      {g}
+                    </span>
+                  ))}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  let box: CSSProperties = css.box;
+  if (
+    frame.glyphOpacity &&
+    isTypewriter &&
+    item.style.lineBackground
+  ) {
+    const visible = frame.glyphOpacity.filter((o) => o > 0).length;
+    const hidden = 100 - (visible / Math.max(1, glyphs.length)) * 100;
+    box = { ...box, clipPath: `inset(-20% ${hidden}% -20% -20%)` };
   }
 
   return (
