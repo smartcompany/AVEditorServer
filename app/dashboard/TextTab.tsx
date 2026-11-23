@@ -11,6 +11,7 @@ import {
   CRAWL_ANIMATION_DEFAULTS,
   DEFAULT_EFFECT_SAMPLE_TEXT,
   DEFAULT_TEMPLATE_SAMPLE_TEXT,
+  TYPEWRITER_ANIMATION_DEFAULTS,
 } from "@/lib/catalog";
 import { ui } from "./ui";
 
@@ -36,12 +37,17 @@ function easeOutCubic(t: number): number {
 }
 
 /** Per-glyph opacity with overlapping windows, as in the app. */
-function staggeredOpacities(count: number, progress: number, hardCut = true): number[] {
+function staggeredOpacities(
+  count: number,
+  progress: number,
+  hardCut = true,
+  overlap = TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
+): number[] {
   if (count <= 0) return [];
-  const overlap = 0.55;
-  const slot = 1 / (count + (count - 1) * overlap);
-  const step = slot * (1 + overlap);
-  const window = slot * (1 + overlap * 0.5);
+  const o = Math.min(0.95, Math.max(0, overlap));
+  const slot = 1 / (count + (count - 1) * o);
+  const step = slot * (1 + o);
+  const window = slot * (1 + o * 0.5);
   return Array.from({ length: count }, (_, i) => {
     const start = i * step;
     if (progress < start) return 0;
@@ -93,7 +99,16 @@ function entranceFrame(
       return { glyphOpacity: null, layerOpacity: eased, layerDy: (1 - eased) * fontPx * 0.45 };
     }
     case "typewriter":
-      return { glyphOpacity: staggeredOpacities(glyphCount, t, true), layerOpacity: 1, layerDy: 0 };
+      return {
+        glyphOpacity: staggeredOpacities(
+          glyphCount,
+          t,
+          true,
+          animation?.staggerOverlap ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
+        ),
+        layerOpacity: 1,
+        layerDy: 0,
+      };
     case "fade": {
       // Whole line fades in together (same as the app's evaluateTextEntrance).
       const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -620,6 +635,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
                             : selected.animation?.durationMs,
                         ...(id === "crawl"
                           ? {
+                              staggerOverlap: undefined,
                               tiltDeg:
                                 selected.animation?.tiltDeg ??
                                 CRAWL_ANIMATION_DEFAULTS.tiltDeg,
@@ -633,12 +649,23 @@ export default function TextTab({ initialCatalog, view }: Props) {
                                 selected.animation?.scrollEndFactor ??
                                 CRAWL_ANIMATION_DEFAULTS.scrollEndFactor,
                             }
-                          : {
-                              tiltDeg: undefined,
-                              perspective: undefined,
-                              scrollStartFactor: undefined,
-                              scrollEndFactor: undefined,
-                            }),
+                          : id === "typewriter"
+                            ? {
+                                staggerOverlap:
+                                  selected.animation?.staggerOverlap ??
+                                  TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
+                                tiltDeg: undefined,
+                                perspective: undefined,
+                                scrollStartFactor: undefined,
+                                scrollEndFactor: undefined,
+                              }
+                            : {
+                                staggerOverlap: undefined,
+                                tiltDeg: undefined,
+                                perspective: undefined,
+                                scrollStartFactor: undefined,
+                                scrollEndFactor: undefined,
+                              }),
                       },
                     });
                   }}
@@ -671,6 +698,31 @@ export default function TextTab({ initialCatalog, view }: Props) {
                   style={ui.input}
                 />
               </label>
+              {selected.animation?.id === "typewriter" && (
+                <label style={ui.fieldLabel}>
+                  글자 오버랩 (staggerOverlap)
+                  <input
+                    type="number"
+                    step={0.05}
+                    min={0}
+                    max={0.95}
+                    value={
+                      selected.animation?.staggerOverlap ??
+                      TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap
+                    }
+                    onChange={(e) =>
+                      selected.animation &&
+                      patchSelected({
+                        animation: {
+                          ...selected.animation,
+                          staggerOverlap: Number(e.target.value),
+                        },
+                      })
+                    }
+                    style={ui.input}
+                  />
+                </label>
+              )}
               {selected.animation?.id === "crawl" && (
                 <>
                   <label style={ui.fieldLabel}>
@@ -899,7 +951,15 @@ function TextPreview({
   );
 
   let box: CSSProperties = css.box;
-  if (frame.glyphOpacity && item.animation?.id === "typewriter" && item.style.lineBackground) {
+  // Single-line torn-paper grow via clip. Multiline must not use a horizontal
+  // clip — that reveals every line at once (unlike the app's per-glyph paint).
+  const multiline = text.includes("\n");
+  if (
+    frame.glyphOpacity &&
+    item.animation?.id === "typewriter" &&
+    item.style.lineBackground &&
+    !multiline
+  ) {
     const visible = frame.glyphOpacity.filter((o) => o > 0).length;
     const hidden = 100 - (visible / Math.max(1, glyphs.length)) * 100;
     box = { ...box, clipPath: `inset(-20% ${hidden}% -20% -20%)` };

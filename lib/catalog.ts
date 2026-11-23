@@ -60,6 +60,11 @@ export type TextEntranceAnimation = {
   /** Entrance length, or recommended overlay span for continuous crawl. */
   durationMs?: number;
   /**
+   * Typewriter only — how much neighbouring glyph windows overlap (0 = one
+   * after another, higher = more concurrent). Default 0.55.
+   */
+  staggerOverlap?: number;
+  /**
    * Crawl only — degrees of classic “bottom nearer / top into distance” tilt.
    * Flutter applies the platform sign; dashboard CSS uses this value as-is.
    * Default 54.
@@ -74,6 +79,10 @@ export type TextEntranceAnimation = {
 };
 
 /** Defaults mirrored by the Flutter client when fields are omitted. */
+export const TYPEWRITER_ANIMATION_DEFAULTS = {
+  staggerOverlap: 0.55,
+} as const;
+
 export const CRAWL_ANIMATION_DEFAULTS = {
   tiltDeg: 54,
   perspective: 0.0012,
@@ -164,13 +173,20 @@ function template(
   style: Omit<TextStyleTemplate, "id" | "label">,
   extras?: { sampleText?: string },
 ): TextTemplatePackItem {
+  const anim: TextEntranceAnimation =
+    animation.id === "typewriter"
+      ? {
+          ...TYPEWRITER_ANIMATION_DEFAULTS,
+          ...animation,
+        }
+      : animation;
   return {
     id,
     title,
     kind: "template",
     premium: false,
     downloadSizeBytes: 0,
-    animation,
+    animation: anim,
     style: { id, label: title, fillUseAccent: false, ...style },
     sampleText: extras?.sampleText?.trim() || DEFAULT_TEMPLATE_SAMPLE_TEXT,
   };
@@ -648,6 +664,26 @@ function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem
   };
 }
 
+function withDefaultAnimationParams(
+  item: TextTemplatePackItem,
+): TextTemplatePackItem {
+  const animation = item.animation;
+  if (!animation) return item;
+  if (animation.id === "typewriter") {
+    return {
+      ...item,
+      animation: { ...TYPEWRITER_ANIMATION_DEFAULTS, ...animation },
+    };
+  }
+  if (animation.id === "crawl") {
+    return {
+      ...item,
+      animation: { ...CRAWL_ANIMATION_DEFAULTS, ...animation },
+    };
+  }
+  return item;
+}
+
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return {
@@ -655,7 +691,9 @@ export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
     baseUrl: normalized,
     categories: PACK_CATEGORIES.map((category) => ({
       ...category,
-      items: category.items.map(withDefaultSampleText),
+      items: category.items.map((item) =>
+        withDefaultAnimationParams(withDefaultSampleText(item)),
+      ),
     })),
   };
 }

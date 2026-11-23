@@ -42,11 +42,25 @@ export function mergeSeedIntoCatalog(
     items: category.items.map((item) => {
       storedIds.add(item.id);
       const seedItem = seedById.get(item.id);
-      if (item.sampleText?.trim()) return item;
-      if (seedItem?.sampleText?.trim()) {
-        return { ...item, sampleText: seedItem.sampleText };
+      let next = item;
+      if (!next.sampleText?.trim() && seedItem?.sampleText?.trim()) {
+        next = { ...next, sampleText: seedItem.sampleText };
       }
-      return item;
+      // Fill typewriter stagger from seed when the saved item lacks it.
+      if (
+        next.animation?.id === "typewriter" &&
+        next.animation.staggerOverlap == null &&
+        seedItem?.animation?.staggerOverlap != null
+      ) {
+        next = {
+          ...next,
+          animation: {
+            ...next.animation,
+            staggerOverlap: seedItem.animation.staggerOverlap,
+          },
+        };
+      }
+      return next;
     }),
   }));
 
