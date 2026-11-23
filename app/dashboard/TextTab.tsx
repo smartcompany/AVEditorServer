@@ -930,16 +930,29 @@ function TextPreview({
           ...box,
           opacity: frame.layerOpacity,
           transform: `translateY(${frame.layerDy}px)`,
+          whiteSpace: "pre-wrap",
+          textAlign: "center",
         }}
       >
         {css.brush && <TornPaper paint={css.brush} />}
-        <span style={{ ...css.text, position: "relative", zIndex: 1 }}>
+        <span
+          style={{
+            ...css.text,
+            position: "relative",
+            zIndex: 1,
+            whiteSpace: "pre-wrap",
+          }}
+        >
           {frame.glyphOpacity
-            ? glyphs.map((g, i) => (
-                <span key={i} style={{ opacity: frame.glyphOpacity![i] }}>
-                  {g}
-                </span>
-              ))
+            ? glyphs.map((g, i) =>
+                g === "\n" ? (
+                  <br key={i} />
+                ) : (
+                  <span key={i} style={{ opacity: frame.glyphOpacity![i] }}>
+                    {g}
+                  </span>
+                ),
+              )
             : text}
         </span>
       </span>
