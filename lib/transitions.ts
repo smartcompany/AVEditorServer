@@ -1017,7 +1017,7 @@ for (const item of BASIC) {
 }
 
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 44,
+  version: 0,
   baseUrl: "",
   categories: [
     {

@@ -61,7 +61,7 @@ export const BACKGROUND_SEED_ITEMS: BackgroundCatalogItem[] = [
   bg("bg_triangles", "삼각형", "triangles.png"),
 ];
 
-export const BACKGROUND_CATALOG_SEED_VERSION = 1;
+export const BACKGROUND_CATALOG_SEED_VERSION = 0;
 
 export function buildBackgroundCatalog(baseUrl: string): BackgroundCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;

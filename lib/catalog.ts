@@ -59,7 +59,35 @@ export type TextEntranceAnimation = {
   id: "typewriter" | "fade" | "slide_up" | "crawl";
   /** Entrance length, or recommended overlay span for continuous crawl. */
   durationMs?: number;
+  /**
+   * Crawl only — degrees of classic “bottom nearer / top into distance” tilt.
+   * Flutter applies the platform sign; dashboard CSS uses this value as-is.
+   * Default 54.
+   */
+  tiltDeg?: number;
+  /** Crawl only — Matrix4 / CSS perspective strength. Default 0.0012. */
+  perspective?: number;
+  /** Crawl only — start translateY as × fontSize (positive = below). Default 14. */
+  scrollStartFactor?: number;
+  /** Crawl only — end translateY as × fontSize (negative = above). Default -32. */
+  scrollEndFactor?: number;
 };
+
+/** Defaults mirrored by the Flutter client when fields are omitted. */
+export const CRAWL_ANIMATION_DEFAULTS = {
+  tiltDeg: 54,
+  perspective: 0.0012,
+  scrollStartFactor: 14,
+  scrollEndFactor: -32,
+} as const;
+
+/** Flat end-credits scroll — same crawl engine, no 3D tilt. */
+export const CREDITS_SCROLL_DEFAULTS = {
+  tiltDeg: 0,
+  perspective: 0.0012,
+  scrollStartFactor: 12,
+  scrollEndFactor: -28,
+} as const;
 
 /**
  * Pack kinds:
@@ -266,6 +294,12 @@ const LOOK = {
     strokes: [stroke(0.06, 0xff5a4000)],
     shadow: softShadow(0.45, 0.15),
   },
+  /** Flat white credits on black (pair with tiltDeg: 0 crawl). */
+  credits: {
+    fillColor: WHITE,
+    preferredFontId: "notoSansKr",
+    shadow: softShadow(0.55, 0.2),
+  },
 } satisfies Record<string, Omit<TextStyleTemplate, "id" | "label">>;
 
 /** Parody placeholder — not the copyrighted opening crawl. */
@@ -292,6 +326,17 @@ their timeline, custodians of the
 stolen plans that can save their
 people and restore free cuts to
 the galaxy…`;
+
+/** Flat end-credits style — title + name/role rows, scrolls straight up. */
+const CREDITS_SCROLL_SAMPLE = `타이틀
+
+이름              설명
+이름              설명
+이름              설명
+이름              설명
+이름              설명
+이름              설명
+이름              설명`;
 
 const MORE_EFFECTS: TextTemplatePackItem[] = [
   effect("effect_outline", "Outline", LOOK.outline),
@@ -364,9 +409,24 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
   template(
     "tpl_star_wars_crawl",
     "Star Crawl",
-    { id: "crawl", durationMs: 18000 },
+    {
+      id: "crawl",
+      durationMs: 18000,
+      ...CRAWL_ANIMATION_DEFAULTS,
+    },
     LOOK.crawl,
     { sampleText: STAR_WARS_CRAWL_SAMPLE },
+  ),
+  template(
+    "tpl_credits_scroll",
+    "Credits Scroll",
+    {
+      id: "crawl",
+      durationMs: 16000,
+      ...CREDITS_SCROLL_DEFAULTS,
+    },
+    LOOK.credits,
+    { sampleText: CREDITS_SCROLL_SAMPLE },
   ),
 ];
 
@@ -596,7 +656,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 11;
+export const TEXT_CATALOG_SEED_VERSION = 0;
 
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;

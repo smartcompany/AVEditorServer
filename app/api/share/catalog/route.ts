@@ -6,7 +6,7 @@ export const runtime = "edge";
  * `more` is not listed — the app always appends the system share action.
  */
 const catalog = {
-  version: 1,
+  version: 0,
   targets: [
     {
       kind: "youtube",

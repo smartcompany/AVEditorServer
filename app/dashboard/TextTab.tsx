@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
+  TextEntranceAnimation,
   TextStyleTemplate,
   TextTemplatePackCatalog,
   TextTemplatePackItem,
 } from "@/lib/catalog";
+import { CRAWL_ANIMATION_DEFAULTS } from "@/lib/catalog";
 import { ui } from "./ui";
 
 type Props = {
@@ -60,16 +62,22 @@ function entranceFrame(
   glyphCount: number,
   progress: number,
   fontPx: number,
+  animation?: TextEntranceAnimation,
 ): EntranceFrame {
   const t = Math.min(1, Math.max(0, progress));
   if (animationId === "crawl") {
-    const startY = fontPx * 6;
-    const endY = -fontPx * 18;
+    const tiltDeg = animation?.tiltDeg ?? CRAWL_ANIMATION_DEFAULTS.tiltDeg;
+    const startF =
+      animation?.scrollStartFactor ?? CRAWL_ANIMATION_DEFAULTS.scrollStartFactor;
+    const endF =
+      animation?.scrollEndFactor ?? CRAWL_ANIMATION_DEFAULTS.scrollEndFactor;
+    const startY = fontPx * startF;
+    const endY = fontPx * endF;
     return {
       glyphOpacity: null,
       layerOpacity: 1,
       layerDy: 0,
-      crawlTiltDeg: 54,
+      crawlTiltDeg: tiltDeg,
       crawlScrollY: startY + (endY - startY) * t,
     };
   }
@@ -602,6 +610,27 @@ export default function TextTab({ initialCatalog, view }: Props) {
                           id === "crawl"
                             ? selected.animation?.durationMs ?? 18000
                             : selected.animation?.durationMs,
+                        ...(id === "crawl"
+                          ? {
+                              tiltDeg:
+                                selected.animation?.tiltDeg ??
+                                CRAWL_ANIMATION_DEFAULTS.tiltDeg,
+                              perspective:
+                                selected.animation?.perspective ??
+                                CRAWL_ANIMATION_DEFAULTS.perspective,
+                              scrollStartFactor:
+                                selected.animation?.scrollStartFactor ??
+                                CRAWL_ANIMATION_DEFAULTS.scrollStartFactor,
+                              scrollEndFactor:
+                                selected.animation?.scrollEndFactor ??
+                                CRAWL_ANIMATION_DEFAULTS.scrollEndFactor,
+                            }
+                          : {
+                              tiltDeg: undefined,
+                              perspective: undefined,
+                              scrollStartFactor: undefined,
+                              scrollEndFactor: undefined,
+                            }),
                       },
                     });
                   }}
@@ -635,20 +664,106 @@ export default function TextTab({ initialCatalog, view }: Props) {
                 />
               </label>
               {selected.animation?.id === "crawl" && (
-                <label style={{ ...ui.fieldLabel, gridColumn: "1 / -1" }}>
-                  샘플 본문 (sampleText)
-                  <textarea
-                    value={selected.sampleText ?? ""}
-                    onChange={(e) =>
-                      patchSelected({
-                        sampleText: e.target.value || undefined,
-                      })
-                    }
-                    rows={8}
-                    spellCheck={false}
-                    style={{ ...ui.jsonArea, minHeight: 140 }}
-                  />
-                </label>
+                <>
+                  <label style={ui.fieldLabel}>
+                    틸트(°)
+                    <input
+                      type="number"
+                      step={1}
+                      value={
+                        selected.animation?.tiltDeg ??
+                        CRAWL_ANIMATION_DEFAULTS.tiltDeg
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            tiltDeg: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    원근 (perspective)
+                    <input
+                      type="number"
+                      step={0.0001}
+                      value={
+                        selected.animation?.perspective ??
+                        CRAWL_ANIMATION_DEFAULTS.perspective
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            perspective: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    시작 Y (×font)
+                    <input
+                      type="number"
+                      step={0.5}
+                      value={
+                        selected.animation?.scrollStartFactor ??
+                        CRAWL_ANIMATION_DEFAULTS.scrollStartFactor
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            scrollStartFactor: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    끝 Y (×font)
+                    <input
+                      type="number"
+                      step={0.5}
+                      value={
+                        selected.animation?.scrollEndFactor ??
+                        CRAWL_ANIMATION_DEFAULTS.scrollEndFactor
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            scrollEndFactor: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={{ ...ui.fieldLabel, gridColumn: "1 / -1" }}>
+                    샘플 본문 (sampleText)
+                    <textarea
+                      value={selected.sampleText ?? ""}
+                      onChange={(e) =>
+                        patchSelected({
+                          sampleText: e.target.value || undefined,
+                        })
+                      }
+                      rows={8}
+                      spellCheck={false}
+                      style={{ ...ui.jsonArea, minHeight: 140 }}
+                    />
+                  </label>
+                </>
               )}
                 </>
               )}
@@ -751,7 +866,16 @@ function TextPreview({
     : item.title || "Hello";
   const glyphs = Array.from(text);
   const css = previewCss(item.style, accent, fontPx);
-  const frame = entranceFrame(item.animation?.id, glyphs.length, progress, fontPx);
+  const frame = entranceFrame(
+    item.animation?.id,
+    glyphs.length,
+    progress,
+    fontPx,
+    item.animation,
+  );
+  const crawlPerspectivePx = Math.round(
+    1 / (item.animation?.perspective ?? CRAWL_ANIMATION_DEFAULTS.perspective),
+  );
 
   let box: CSSProperties = css.box;
   if (frame.glyphOpacity && item.animation?.id === "typewriter" && item.style.lineBackground) {
@@ -762,7 +886,7 @@ function TextPreview({
 
   if (isCrawl) {
     return (
-      <div style={styles.crawlStage}>
+      <div style={{ ...styles.crawlStage, perspective: `${crawlPerspectivePx}px` }}>
         <div
           style={{
             width: "72%",

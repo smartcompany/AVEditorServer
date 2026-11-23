@@ -48,7 +48,7 @@ export type PlansConfig = {
   plans: PlanConfigItem[];
 };
 
-export const PLANS_CONFIG_VERSION = 1;
+export const PLANS_CONFIG_VERSION = 0;
 
 function L(
   en: string,
