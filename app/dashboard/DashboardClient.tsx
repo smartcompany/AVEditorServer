@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import type { BackgroundCatalog } from "@/lib/backgrounds";
 import type { TextTemplatePackCatalog } from "@/lib/catalog";
 import type { PlansConfig } from "@/lib/plans-config";
 import type { TransitionCatalogDto } from "@/lib/transitions";
 import AnalyticsTab from "./AnalyticsTab";
+import BackgroundsTab from "./BackgroundsTab";
 import PlansTab from "./PlansTab";
 import SubscriptionsTab from "./SubscriptionsTab";
 import TextTab from "./TextTab";
@@ -16,6 +18,7 @@ const TABS = [
   { id: "transitions", label: "전환 효과" },
   { id: "textEffects", label: "텍스트 효과" },
   { id: "textTemplates", label: "텍스트 템플릿" },
+  { id: "backgrounds", label: "배경" },
   { id: "plans", label: "구독 플랜" },
   { id: "subscriptions", label: "구독" },
   { id: "revenue", label: "수익 (구독·광고)" },
@@ -27,12 +30,14 @@ type TabId = (typeof TABS)[number]["id"];
 type Props = {
   initialTransitions: TransitionCatalogDto;
   initialText: TextTemplatePackCatalog;
+  initialBackgrounds: BackgroundCatalog;
   initialPlans: PlansConfig;
 };
 
 export default function DashboardClient({
   initialTransitions,
   initialText,
+  initialBackgrounds,
   initialPlans,
 }: Props) {
   const [tab, setTab] = useState<TabId>("transitions");
@@ -93,9 +98,11 @@ export default function DashboardClient({
       >
         <TextTab
           initialCatalog={initialText}
-         
           view={tab === "textTemplates" ? "templates" : "effects"}
         />
+      </div>
+      <div style={{ display: tab === "backgrounds" ? "block" : "none" }}>
+        <BackgroundsTab initialCatalog={initialBackgrounds} />
       </div>
       <div style={{ display: tab === "plans" ? "block" : "none" }}>
         <PlansTab initialConfig={initialPlans} />

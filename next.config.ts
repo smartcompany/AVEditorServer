@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
         source: "/api/transitions/catalog.json",
         destination: "/api/transitions/catalog",
       },
+      {
+        source: "/backgrounds/catalog.json",
+        destination: "/api/backgrounds/catalog",
+      },
+      {
+        source: "/api/backgrounds/catalog.json",
+        destination: "/api/backgrounds/catalog",
+      },
     ];
   },
   async headers() {

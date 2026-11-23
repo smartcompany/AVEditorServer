@@ -15,6 +15,14 @@
     {
       "source": "/share/catalog.json",
       "destination": "/api/share/catalog"
+    },
+    {
+      "source": "/backgrounds/catalog.json",
+      "destination": "/api/backgrounds/catalog"
+    },
+    {
+      "source": "/api/backgrounds/catalog.json",
+      "destination": "/api/backgrounds/catalog"
     }
   ]
 }
