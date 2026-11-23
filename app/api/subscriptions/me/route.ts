@@ -20,7 +20,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-/** GET /api/subscriptions/me?deviceKey= — entitlement for this install (login optional). */
+/** GET /api/subscriptions/me?deviceKey= — entitlement for account (uid) and/or install. */
 export async function GET(request: NextRequest) {
   if (!hasSupabaseConfig()) {
     return json({ error: "subscriptions_unavailable" }, 503);
@@ -42,13 +42,18 @@ export async function GET(request: NextRequest) {
     const active = rows.filter((r) =>
       isSubscriptionActive(r.status, r.expires_at),
     );
+    const planTier = synced.planTier || bestActiveTier(rows);
+    const primary =
+      active.find((r) => r.tier === planTier) ?? active[0] ?? null;
     const account =
       synced.account ??
-      (deviceKey ? await findAccountByDevice(deviceKey) : null) ??
-      (user ? await findAccountByUid(user.uid) : null);
+      (user ? await findAccountByUid(user.uid) : null) ??
+      (deviceKey ? await findAccountByDevice(deviceKey) : null);
 
     return json({
-      planTier: synced.planTier || bestActiveTier(rows),
+      planTier,
+      productId: primary?.product_id ?? null,
+      firebaseUid: user?.uid ?? account?.firebase_uid ?? null,
       balance: account?.balance ?? null,
       subscriptions: active.map((r) => ({
         platform: r.platform,

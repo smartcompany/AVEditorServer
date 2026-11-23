@@ -56,7 +56,8 @@ export type TextStyleTemplate = {
 };
 
 export type TextEntranceAnimation = {
-  id: "typewriter" | "fade" | "slide_up";
+  id: "typewriter" | "fade" | "slide_up" | "crawl";
+  /** Entrance length, or recommended overlay span for continuous crawl. */
   durationMs?: number;
 };
 
@@ -82,6 +83,8 @@ export type TextTemplatePackItem = {
   style: TextStyleTemplate;
   /** Entrance motion; omit for static text effects. */
   animation?: TextEntranceAnimation;
+  /** Optional body text applied when the user picks this pack. */
+  sampleText?: string;
 };
 
 export type TextTemplatePackCategory = {
@@ -125,6 +128,7 @@ function template(
   title: string,
   animation: TextEntranceAnimation,
   style: Omit<TextStyleTemplate, "id" | "label">,
+  extras?: { sampleText?: string },
 ): TextTemplatePackItem {
   return {
     id,
@@ -134,6 +138,7 @@ function template(
     downloadSizeBytes: 0,
     animation,
     style: { id, label: title, fillUseAccent: false, ...style },
+    ...(extras?.sampleText ? { sampleText: extras.sampleText } : {}),
   };
 }
 
@@ -255,7 +260,38 @@ const LOOK = {
     preferredFontId: "blackHanSans",
     strokes: [stroke(0.22, WHITE), stroke(0.1, INK)],
   },
+  crawl: {
+    fillColor: 0xffffe81f,
+    preferredFontId: "blackHanSans",
+    strokes: [stroke(0.06, 0xff5a4000)],
+    shadow: softShadow(0.45, 0.15),
+  },
 } satisfies Record<string, Omit<TextStyleTemplate, "id" | "label">>;
+
+/** Parody placeholder — not the copyrighted opening crawl. */
+const STAR_WARS_CRAWL_SAMPLE = `EPISODE ZERO
+
+A NEW TIMELINE
+
+It is a period of creative chaos.
+Rebel editors, striking from a
+hidden studio, have won their
+first victory against the Empire
+of blank timelines.
+
+During the battle, spies managed
+to steal secret plans to the
+ultimate editing station, the
+AV EDITOR, an app with enough
+power to finish an entire short
+in a single afternoon.
+
+Pursued by endless export queues,
+the Rebel editors race home aboard
+their timeline, custodians of the
+stolen plans that can save their
+people and restore free cuts to
+the galaxy…`;
 
 const MORE_EFFECTS: TextTemplatePackItem[] = [
   effect("effect_outline", "Outline", LOOK.outline),
@@ -325,6 +361,13 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
     preferredFontId: "doHyeon",
     lineBackground: capsule(WHITE, 1, 0.12),
   }),
+  template(
+    "tpl_star_wars_crawl",
+    "Star Crawl",
+    { id: "crawl", durationMs: 18000 },
+    LOOK.crawl,
+    { sampleText: STAR_WARS_CRAWL_SAMPLE },
+  ),
 ];
 
 /**
@@ -553,7 +596,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 10;
+export const TEXT_CATALOG_SEED_VERSION = 11;
 
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
   const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;

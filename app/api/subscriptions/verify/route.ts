@@ -25,14 +25,14 @@ function json(data: unknown, status = 200) {
  * POST /api/subscriptions/verify
  * Body:
  *  {
- *    deviceKey: string,                 // required (no app login)
+ *    deviceKey: string,
  *    platform: "ios" | "android",
  *    productId: string,
  *    verificationData?: string,         // iOS JWS
  *    transactionId?: string,
  *    purchaseToken?: string,            // Android
  *  }
- * Optional Authorization: Bearer <Firebase ID token>
+ * Requires Authorization: Bearer <Firebase ID token> — entitlement is account-based.
  */
 export async function POST(request: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const user = await optionalFirebaseUser(request);
+    if (!user?.uid) {
+      return json({ error: "auth_required" }, 401);
+    }
     const body = (await request.json()) as {
       deviceKey?: string;
       platform?: string;
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (!productId) return json({ error: "productId_required" }, 400);
 
     const owner = {
-      firebaseUid: user?.uid ?? null,
+      firebaseUid: user.uid,
       deviceKey,
     };
 
@@ -139,6 +142,8 @@ export async function POST(request: NextRequest) {
     const synced = await syncPlanTierForOwner(owner);
     return json({
       planTier: synced.planTier,
+      productId,
+      firebaseUid: user.uid,
       balance: synced.account?.balance ?? null,
     });
   } catch (e) {

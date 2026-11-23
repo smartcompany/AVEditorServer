@@ -50,6 +50,9 @@ type EntranceFrame = {
   glyphOpacity: number[] | null;
   layerOpacity: number;
   layerDy: number;
+  /** Continuous crawl: rotateX (deg) + translateY (px). */
+  crawlTiltDeg?: number;
+  crawlScrollY?: number;
 };
 
 function entranceFrame(
@@ -59,6 +62,17 @@ function entranceFrame(
   fontPx: number,
 ): EntranceFrame {
   const t = Math.min(1, Math.max(0, progress));
+  if (animationId === "crawl") {
+    const startY = fontPx * 6;
+    const endY = -fontPx * 18;
+    return {
+      glyphOpacity: null,
+      layerOpacity: 1,
+      layerDy: 0,
+      crawlTiltDeg: 54,
+      crawlScrollY: startY + (endY - startY) * t,
+    };
+  }
   if (!animationId || t >= 1) return { glyphOpacity: null, layerOpacity: 1, layerDy: 0 };
   if (t <= 0) return { glyphOpacity: null, layerOpacity: 0, layerDy: fontPx * 0.35 };
   switch (animationId) {
@@ -246,7 +260,7 @@ function TornPaper({ paint }: { paint: BrushPaint }) {
   );
 }
 
-const ANIMATIONS = ["typewriter", "fade", "slide_up"] as const;
+const ANIMATIONS = ["typewriter", "fade", "slide_up", "crawl"] as const;
 
 export default function TextTab({ initialCatalog, view }: Props) {
   const [catalog, setCatalog] = useState(initialCatalog);
@@ -575,24 +589,35 @@ export default function TextTab({ initialCatalog, view }: Props) {
               {view === "templates" && (
                 <>
               <label style={ui.fieldLabel}>
-                등장 애니메이션
+                애니메이션
                 <select
                   value={selected.animation?.id ?? "fade"}
                   onChange={(e) => {
                     const id = e.target.value as (typeof ANIMATIONS)[number];
-                    patchSelected({ animation: { ...(selected.animation ?? {}), id } });
+                    patchSelected({
+                      animation: {
+                        ...(selected.animation ?? {}),
+                        id,
+                        durationMs:
+                          id === "crawl"
+                            ? selected.animation?.durationMs ?? 18000
+                            : selected.animation?.durationMs,
+                      },
+                    });
                   }}
                   style={ui.input}
                 >
                   {ANIMATIONS.map((a) => (
                     <option key={a} value={a}>
-                      {a}
+                      {a === "crawl" ? "crawl (크롤)" : a}
                     </option>
                   ))}
                 </select>
               </label>
               <label style={ui.fieldLabel}>
-                애니메이션 길이(ms)
+                {selected.animation?.id === "crawl"
+                  ? "크롤 길이(ms)"
+                  : "애니메이션 길이(ms)"}
                 <input
                   type="number"
                   value={selected.animation?.durationMs ?? ""}
@@ -609,6 +634,22 @@ export default function TextTab({ initialCatalog, view }: Props) {
                   style={ui.input}
                 />
               </label>
+              {selected.animation?.id === "crawl" && (
+                <label style={{ ...ui.fieldLabel, gridColumn: "1 / -1" }}>
+                  샘플 본문 (sampleText)
+                  <textarea
+                    value={selected.sampleText ?? ""}
+                    onChange={(e) =>
+                      patchSelected({
+                        sampleText: e.target.value || undefined,
+                      })
+                    }
+                    rows={8}
+                    spellCheck={false}
+                    style={{ ...ui.jsonArea, minHeight: 140 }}
+                  />
+                </label>
+              )}
                 </>
               )}
               <label style={ui.fieldLabel}>
@@ -675,6 +716,16 @@ const styles: Record<string, CSSProperties> = {
     placeItems: "center",
     background:
       "linear-gradient(135deg, #3b4a6b 0%, #6b4a7a 50%, #9a5a5a 100%)",
+    overflow: "hidden",
+  },
+  crawlStage: {
+    height: 280,
+    borderRadius: 12,
+    display: "grid",
+    placeItems: "center",
+    background: "#000",
+    overflow: "hidden",
+    perspective: "480px",
   },
 };
 
@@ -693,8 +744,11 @@ function TextPreview({
   accent: string;
   progress: number;
 }) {
-  const fontPx = 34;
-  const text = item.title || "Hello";
+  const isCrawl = item.animation?.id === "crawl";
+  const fontPx = isCrawl ? 18 : 34;
+  const text = isCrawl
+    ? (item.sampleText?.trim() || item.title || "Episode crawl…")
+    : item.title || "Hello";
   const glyphs = Array.from(text);
   const css = previewCss(item.style, accent, fontPx);
   const frame = entranceFrame(item.animation?.id, glyphs.length, progress, fontPx);
@@ -704,6 +758,24 @@ function TextPreview({
     const visible = frame.glyphOpacity.filter((o) => o > 0).length;
     const hidden = 100 - (visible / Math.max(1, glyphs.length)) * 100;
     box = { ...box, clipPath: `inset(-20% ${hidden}% -20% -20%)` };
+  }
+
+  if (isCrawl) {
+    return (
+      <div style={styles.crawlStage}>
+        <div
+          style={{
+            width: "72%",
+            transformOrigin: "center top",
+            transform: `rotateX(${frame.crawlTiltDeg ?? 54}deg) translateY(${frame.crawlScrollY ?? 0}px)`,
+            textAlign: "center",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          <span style={{ ...css.text, fontSize: fontPx, lineHeight: 1.35 }}>{text}</span>
+        </div>
+      </div>
+    );
   }
 
   return (

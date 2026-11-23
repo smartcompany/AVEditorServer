@@ -30,7 +30,7 @@ type RestoreItem = {
 /**
  * POST /api/subscriptions/restore
  * Body: { deviceKey, purchases?: RestoreItem[] }
- * Optional Authorization: Bearer <Firebase ID token>
+ * Requires Authorization: Bearer <Firebase ID token>.
  */
 export async function POST(request: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -39,18 +39,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const user = await optionalFirebaseUser(request);
+    if (!user?.uid) {
+      return json({ error: "auth_required" }, 401);
+    }
     const body = (await request.json()) as {
       deviceKey?: string;
       purchases?: RestoreItem[];
     };
     const deviceKey = body.deviceKey?.trim();
-    if (!deviceKey && !user) {
+    if (!deviceKey) {
       return json({ error: "deviceKey_required" }, 400);
     }
 
     const owner = {
-      firebaseUid: user?.uid ?? null,
-      deviceKey: deviceKey || null,
+      firebaseUid: user.uid,
+      deviceKey,
     };
     const purchases = Array.isArray(body.purchases) ? body.purchases : [];
     if (purchases.length === 0) {
