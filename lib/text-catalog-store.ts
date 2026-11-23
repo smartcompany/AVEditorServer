@@ -23,11 +23,53 @@ function withBaseUrl(
 }
 
 /**
+ * Merge seed items missing from a saved catalog so code-side templates
+ * (e.g. Star Crawl) still appear after a dashboard save, without wiping edits.
+ * Storage item wins on id collision.
+ */
+export function mergeSeedIntoCatalog(
+  stored: TextTemplatePackCatalog,
+  seed: TextTemplatePackCatalog,
+): TextTemplatePackCatalog {
+  const storedIds = new Set<string>();
+  for (const category of stored.categories) {
+    for (const item of category.items) storedIds.add(item.id);
+  }
+
+  const categories = stored.categories.map((category) => ({
+    ...category,
+    items: [...category.items],
+  }));
+
+  for (const seedCategory of seed.categories) {
+    const missing = seedCategory.items.filter((item) => !storedIds.has(item.id));
+    if (missing.length === 0) continue;
+    const idx = categories.findIndex((c) => c.id === seedCategory.id);
+    if (idx >= 0) {
+      categories[idx] = {
+        ...categories[idx],
+        items: [...categories[idx].items, ...missing],
+      };
+    } else {
+      categories.push({ ...seedCategory, items: [...missing] });
+    }
+    for (const item of missing) storedIds.add(item.id);
+  }
+
+  return {
+    ...stored,
+    categories,
+    // Keep stored version for dashboard save churn; seed merge is additive.
+    version: Math.max(stored.version, seed.version),
+  };
+}
+
+/**
  * Text effects + templates for Flutter and the dashboard.
  *
  * Supabase Storage (`text_packs/catalog.json`) wins once the dashboard has
  * saved it; the TypeScript seed is used when Storage is empty, unreachable,
- * or older than the seed (so code-side catalog changes still ship).
+ * or older than the seed. Missing seed items are always merged in.
  */
 export async function getTextPackCatalog(
   origin: string,
@@ -49,7 +91,7 @@ export async function getTextPackCatalog(
     const parsed: unknown = await res.json();
     if (!isCatalogShape(parsed)) return seed;
     if (parsed.version < TEXT_CATALOG_SEED_VERSION) return seed;
-    return withBaseUrl(parsed, origin);
+    return withBaseUrl(mergeSeedIntoCatalog(parsed, seed), origin);
   } catch (error) {
     console.warn("[text-packs] Storage read failed, using seed:", error);
     return seed;

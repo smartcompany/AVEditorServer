@@ -302,41 +302,14 @@ const LOOK = {
   },
 } satisfies Record<string, Omit<TextStyleTemplate, "id" | "label">>;
 
-/** Parody placeholder — not the copyrighted opening crawl. */
-const STAR_WARS_CRAWL_SAMPLE = `EPISODE ZERO
+/** Shared placeholder for crawl / credits scroll templates. */
+const SCROLL_SAMPLE = `Hello
 
-A NEW TIMELINE
+I am making a short film.
+This is where the story begins.
 
-It is a period of creative chaos.
-Rebel editors, striking from a
-hidden studio, have won their
-first victory against the Empire
-of blank timelines.
-
-During the battle, spies managed
-to steal secret plans to the
-ultimate editing station, the
-AV EDITOR, an app with enough
-power to finish an entire short
-in a single afternoon.
-
-Pursued by endless export queues,
-the Rebel editors race home aboard
-their timeline, custodians of the
-stolen plans that can save their
-people and restore free cuts to
-the galaxy…`;
-
-/** Flat end-credits style — title + name/role rows, scrolls straight up. */
-const CREDITS_SCROLL_SAMPLE = `타이틀
-
-이름              설명
-이름              설명
-이름              설명
-이름              설명
-이름              설명
-이름              설명
-이름              설명`;
+Thank you for watching.
+See you next time.`;
 
 const MORE_EFFECTS: TextTemplatePackItem[] = [
   effect("effect_outline", "Outline", LOOK.outline),
@@ -415,7 +388,7 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
       ...CRAWL_ANIMATION_DEFAULTS,
     },
     LOOK.crawl,
-    { sampleText: STAR_WARS_CRAWL_SAMPLE },
+    { sampleText: SCROLL_SAMPLE },
   ),
   template(
     "tpl_credits_scroll",
@@ -426,7 +399,7 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
       ...CREDITS_SCROLL_DEFAULTS,
     },
     LOOK.credits,
-    { sampleText: CREDITS_SCROLL_SAMPLE },
+    { sampleText: SCROLL_SAMPLE },
   ),
 ];
 
