@@ -1,6 +1,6 @@
 /**
  * Writes client/assets/backgrounds/catalog.json from the server seed.
- * Run: npm run export:backgrounds
+ * Run: npm run export:backgrounds --seed
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
