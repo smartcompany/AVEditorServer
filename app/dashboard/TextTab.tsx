@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import type {
   TextComposition,
   TextEntranceAnimation,
+  TextPackLayout,
   TextStyleTemplate,
   TextTemplatePackCatalog,
   TextTemplatePackItem,
@@ -878,6 +879,64 @@ export default function TextTab({ initialCatalog, view }: Props) {
                   </label>
                 </>
               )}
+              <label style={ui.fieldLabel}>
+                줄 레이아웃 (layout.perLine)
+                <select
+                  value={
+                    selected.layout?.perLine === true
+                      ? "true"
+                      : selected.layout?.perLine === false
+                        ? "false"
+                        : "auto"
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "auto") {
+                      const rest = { ...selected };
+                      delete rest.layout;
+                      updateItem(selected.id, rest);
+                      return;
+                    }
+                    patchSelected({
+                      layout: {
+                        ...selected.layout,
+                        perLine: v === "true",
+                        lineGapFactor: selected.layout?.lineGapFactor ?? 0.12,
+                        align: selected.layout?.align ?? "center",
+                      },
+                    });
+                  }}
+                  style={ui.input}
+                >
+                  <option value="auto">auto (lineBackground 있으면 줄별)</option>
+                  <option value="true">true (줄마다 종이/배경)</option>
+                  <option value="false">false (블록 하나)</option>
+                </select>
+              </label>
+              {(selected.layout?.perLine ||
+                selected.style.lineBackground) && (
+                <label style={ui.fieldLabel}>
+                  줄 간격 (layout.lineGapFactor)
+                  <input
+                    type="number"
+                    step={0.02}
+                    min={0}
+                    max={1}
+                    value={selected.layout?.lineGapFactor ?? 0.12}
+                    onChange={(e) =>
+                      patchSelected({
+                        layout: {
+                          ...selected.layout,
+                          perLine: selected.layout?.perLine ?? true,
+                          lineGapFactor: Number(e.target.value),
+                          align: selected.layout?.align ?? "center",
+                        },
+                      })
+                    }
+                    style={ui.input}
+                  />
+                </label>
+              )}
               {selected.animation?.id === "crawl" && (
                 <>
                   <label style={ui.fieldLabel}>
@@ -1287,17 +1346,27 @@ function CompositionPreview({
 }
 
 /**
- * Text preview. For templates [progress] < 1 plays the app's entrance:
- * typewriter shows glyphs one by one (and reveals the background with them,
- * like the torn-paper fix in the app), fade eases glyphs in, slide_up lifts
- * the whole line while fading in.
+ * Resolve catalog layout. Prefer explicit JSON; fall back so older items with
+ * a lineBackground still get per-line strips (app legacy behaviour).
+ */
+function resolvePackLayout(
+  item: TextTemplatePackItem,
+  multiline: boolean,
+): TextPackLayout {
+  if (item.layout) return item.layout;
+  if (multiline && item.style.lineBackground) {
+    return { perLine: true, lineGapFactor: 0.12, align: "center" };
+  }
+  return { perLine: false, align: "center" };
+}
+
+/**
+ * Text preview. For templates [progress] < 1 plays the app's entrance.
  *
- * Multiline typewriter is line-sequential (Hello finishes, then World) with
- * one torn-paper strip per line — a single shared brush box would silhouette
- * every line at once and read as parallel typing.
- *
- * All lines stay mounted from t=0 (invisible glyphs still reserve space) so
- * the block does not jump when the next line starts typing.
+ * Layout geometry comes from catalog `layout` (not animation.staggerBy).
+ * Timing (Hello then World) comes from animation.staggerBy.
+ * All line slots stay mounted from t=0 so the block never jumps — same as the
+ * app's TextPainter which always shapes the full string.
  */
 function TextPreview({
   item,
@@ -1330,12 +1399,14 @@ function TextPreview({
 
   const multiline = text.includes("\n");
   const isTypewriter = item.animation?.id === "typewriter";
-  const byLine =
-    isTypewriter &&
-    staggerByLine(
-      text,
-      item.animation?.staggerBy ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerBy,
-    );
+  const layout = resolvePackLayout(item, multiline);
+  const alignItems =
+    layout.align === "start"
+      ? "flex-start"
+      : layout.align === "end"
+        ? "flex-end"
+        : "center";
+  const lineGap = fontPx * (layout.lineGapFactor ?? 0.12);
 
   if (isCrawl) {
     return (
@@ -1355,18 +1426,24 @@ function TextPreview({
     );
   }
 
-  // Line-by-line typewriter: each line is its own paper + glyph strip.
-  if (isTypewriter && byLine && multiline && frame.glyphOpacity) {
+  // Catalog layout.perLine → one paper/glyph strip per line (Journal / Memo).
+  // Always mount every line so height matches the finished frame from t=0.
+  if (layout.perLine && multiline) {
     const lines = sampleLines(text);
     let glyphOffset = 0;
+    // entranceFrame drops glyphOpacity at t=0 / t>=1; synthesize so layout
+    // path stays stable for the whole preview loop.
+    const allOpacity =
+      frame.glyphOpacity ??
+      glyphs.map(() => (progress >= 1 ? 1 : progress <= 0 ? 0 : 1));
     return (
       <div style={styles.previewStage}>
         <div
           style={{
             display: "inline-flex",
             flexDirection: "column",
-            alignItems: "center",
-            gap: fontPx * 0.12,
+            alignItems,
+            gap: lineGap,
             opacity: frame.layerOpacity,
             transform: `translateY(${frame.layerDy}px)`,
           }}
@@ -1375,22 +1452,20 @@ function TextPreview({
             const lineGlyphs = Array.from(line);
             const start = glyphOffset;
             glyphOffset += lineGlyphs.length + (li < lines.length - 1 ? 1 : 0);
-            const opacities = frame.glyphOpacity!.slice(
-              start,
-              start + lineGlyphs.length,
-            );
-            // Keep every line in the layout from the start (opacity 0 glyphs
-            // still take space). Only the paper reveal + glyph opacity animate.
+            const opacities = allOpacity.slice(start, start + lineGlyphs.length);
             const visibleCount = opacities.filter((o) => o > 0).length;
+            const revealTypewriter = isTypewriter && progress < 1 && progress > 0;
             const hidden =
-              lineGlyphs.length === 0
-                ? 0
+              !revealTypewriter || lineGlyphs.length === 0
+                ? progress <= 0
+                  ? 100
+                  : 0
                 : 100 - (visibleCount / lineGlyphs.length) * 100;
             const lineBox: CSSProperties = {
               ...css.box,
               display: "inline-block",
               whiteSpace: "pre",
-              textAlign: "center",
+              textAlign: layout.align ?? "center",
               ...(item.style.lineBackground && lineGlyphs.length > 0
                 ? { clipPath: `inset(-20% ${hidden}% -20% -20%)` }
                 : {}),
@@ -1410,8 +1485,7 @@ function TextPreview({
                     <span
                       key={i}
                       style={{
-                        opacity: opacities[i] ?? 0,
-                        // Invisible glyphs must still reserve width/height.
+                        opacity: opacities[i] ?? (progress >= 1 ? 1 : 0),
                         visibility: "visible",
                       }}
                     >
@@ -1446,7 +1520,7 @@ function TextPreview({
           opacity: frame.layerOpacity,
           transform: `translateY(${frame.layerDy}px)`,
           whiteSpace: "pre-wrap",
-          textAlign: "center",
+          textAlign: layout.align ?? "center",
         }}
       >
         {css.brush && <TornPaper paint={css.brush} />}

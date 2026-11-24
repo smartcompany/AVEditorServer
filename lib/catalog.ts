@@ -135,6 +135,21 @@ export const CREDITS_SCROLL_DEFAULTS = {
  */
 export type TextTemplatePackKind = "effect" | "template";
 
+/**
+ * Line / block placement hints (spec §6). Renderers must not invent this from
+ * animation.staggerBy — stagger controls timing; layout controls geometry.
+ */
+export type TextPackLayout = {
+  /** One underlay / paper strip per line (Journal). false = single block. */
+  perLine?: boolean;
+  /** Extra gap between lines as a multiple of fontSize. */
+  lineGapFactor?: number;
+  /** Soft clamp; product prefers scale-down when exceeded. */
+  maxLines?: number;
+  /** Overlay-box alignment for the text block. */
+  align?: "start" | "center" | "end";
+};
+
 export type TextTemplatePackItem = {
   id: string;
   title: string;
@@ -150,6 +165,11 @@ export type TextTemplatePackItem = {
   style: TextStyleTemplate;
   /** Entrance motion; omit for static text effects. */
   animation?: TextEntranceAnimation;
+  /**
+   * Line geometry (per-line strips, gap, align). Server-driven — app and
+   * dashboard must both read this instead of hardcoding Journal behaviour.
+   */
+  layout?: TextPackLayout;
   /** Optional body text applied when the user picks this pack. */
   sampleText?: string;
   /**
@@ -709,21 +729,24 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
   }),
   template("pack_breaking", "Breaking", { id: "slide_up", durationMs: 500 }, LOOK.news),
   template("pack_marker", "Marker", { id: "typewriter", durationMs: 800 }, LOOK.highlight),
-  template("pack_memo", "Memo", { id: "typewriter", durationMs: 900 }, {
-    fillColor: 0xff3a2a10,
-    preferredFontId: "gaegu",
-    lineBackground: {
-      useAccent: false,
-      color: 0xffffe98a,
-      opacity: 1,
-      padHFactor: 0.42,
-      padVFactor: 0.32,
-      radiusFactor: 0.3,
-      shape: "brush",
-      shadowOpacity: 0.45,
-      shadowBlurFactor: 0.25,
-    },
-  }),
+  {
+    ...template("pack_memo", "Memo", { id: "typewriter", durationMs: 900 }, {
+      fillColor: 0xff3a2a10,
+      preferredFontId: "gaegu",
+      lineBackground: {
+        useAccent: false,
+        color: 0xffffe98a,
+        opacity: 1,
+        padHFactor: 0.42,
+        padVFactor: 0.32,
+        radiusFactor: 0.3,
+        shape: "brush",
+        shadowOpacity: 0.45,
+        shadowBlurFactor: 0.25,
+      },
+    }),
+    layout: { perLine: true, lineGapFactor: 0.12, align: "center" },
+  },
   template("pack_neon_pink", "Neon Pink", { id: "fade", durationMs: 900 }, LOOK.neonPink),
   template("pack_cyber", "Cyber", { id: "typewriter", durationMs: 700 }, LOOK.neonBlue),
   template("pack_gold_title", "Gold Title", { id: "slide_up", durationMs: 800 }, LOOK.gold),
@@ -869,6 +892,7 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
         kind: "effect",
         premium: false,
         downloadSizeBytes: 0,
+        layout: { perLine: true, lineGapFactor: 0.12, align: "center" },
         style: {
           id: "effect_torn_label",
           label: "Torn",
@@ -906,6 +930,8 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
           durationMs: 900,
           staggerBy: "line",
         },
+        // Geometry (not timing): keep every line slot from t=0 — matches app.
+        layout: { perLine: true, lineGapFactor: 0.12, align: "center" },
         style: {
           id: "pack_journal",
           label: "Journal",
@@ -1010,7 +1036,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 13;
+export const TEXT_CATALOG_SEED_VERSION = 14;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;
