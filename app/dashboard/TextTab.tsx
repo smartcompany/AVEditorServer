@@ -1295,6 +1295,9 @@ function CompositionPreview({
  * Multiline typewriter is line-sequential (Hello finishes, then World) with
  * one torn-paper strip per line — a single shared brush box would silhouette
  * every line at once and read as parallel typing.
+ *
+ * All lines stay mounted from t=0 (invisible glyphs still reserve space) so
+ * the block does not jump when the next line starts typing.
  */
 function TextPreview({
   item,
@@ -1372,11 +1375,12 @@ function TextPreview({
             const lineGlyphs = Array.from(line);
             const start = glyphOffset;
             glyphOffset += lineGlyphs.length + (li < lines.length - 1 ? 1 : 0);
-            const opacities = frame.glyphOpacity!.slice(start, start + lineGlyphs.length);
-            const anyVisible = opacities.some((o) => o > 0.01);
-            if (!anyVisible && progress < 1) {
-              return null;
-            }
+            const opacities = frame.glyphOpacity!.slice(
+              start,
+              start + lineGlyphs.length,
+            );
+            // Keep every line in the layout from the start (opacity 0 glyphs
+            // still take space). Only the paper reveal + glyph opacity animate.
             const visibleCount = opacities.filter((o) => o > 0).length;
             const hidden =
               lineGlyphs.length === 0
@@ -1403,8 +1407,15 @@ function TextPreview({
                   }}
                 >
                   {lineGlyphs.map((g, i) => (
-                    <span key={i} style={{ opacity: opacities[i] ?? 0 }}>
-                      {g}
+                    <span
+                      key={i}
+                      style={{
+                        opacity: opacities[i] ?? 0,
+                        // Invisible glyphs must still reserve width/height.
+                        visibility: "visible",
+                      }}
+                    >
+                      {g === " " ? "\u00a0" : g}
                     </span>
                   ))}
                 </span>
