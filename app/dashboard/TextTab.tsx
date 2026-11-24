@@ -13,8 +13,17 @@ import {
   CRAWL_ANIMATION_DEFAULTS,
   DEFAULT_EFFECT_SAMPLE_TEXT,
   DEFAULT_TEMPLATE_SAMPLE_TEXT,
+  ENTRANCE_ANIMATION_IDS,
+  FOCUS_ANIMATION_DEFAULTS,
+  GLITCH_ANIMATION_DEFAULTS,
+  IMPACT_ANIMATION_DEFAULTS,
+  KINETIC_ANIMATION_DEFAULTS,
+  NEON_ANIMATION_DEFAULTS,
+  POP_ANIMATION_DEFAULTS,
+  STAGED_ANIMATION_DEFAULTS,
   TYPEWRITER_ANIMATION_DEFAULTS,
   compositionSampleText,
+  type TextEntranceAnimationId,
 } from "@/lib/catalog";
 import { ui } from "./ui";
 
@@ -119,10 +128,24 @@ type EntranceFrame = {
   glyphOpacity: number[] | null;
   layerOpacity: number;
   layerDy: number;
-  /** Continuous crawl: rotateX (deg) + translateY (px). */
+  layerDx?: number;
+  layerScale?: number;
+  layerBlur?: number;
+  rgbOffset?: number;
+  glowPulse?: number;
+  cursorVisible?: boolean;
+  slotOpacity?: number[];
+  slotDy?: number[];
   crawlTiltDeg?: number;
   crawlScrollY?: number;
 };
+
+function easeOutBack(t: number, overshoot: number): number {
+  const c1 = 1.70158 * (1 + overshoot * 2);
+  const c3 = c1 + 1;
+  const u = t - 1;
+  return 1 + c3 * u * u * u + c1 * u * u;
+}
 
 function entranceFrame(
   animationId: string | undefined,
@@ -130,9 +153,15 @@ function entranceFrame(
   progress: number,
   fontPx: number,
   animation?: TextEntranceAnimation,
+  slotCount?: number,
 ): EntranceFrame {
   const t = Math.min(1, Math.max(0, progress));
   const glyphCount = glyphs.length;
+  const inferredSlots = glyphs
+    .join("")
+    .split("\n")
+    .filter((l) => l.trim()).length;
+  const slots = Math.max(1, slotCount ?? (inferredSlots || 1));
   if (animationId === "crawl") {
     const tiltDeg = animation?.tiltDeg ?? CRAWL_ANIMATION_DEFAULTS.tiltDeg;
     const startF =
@@ -149,8 +178,28 @@ function entranceFrame(
       crawlScrollY: startY + (endY - startY) * t,
     };
   }
-  if (!animationId || t >= 1) return { glyphOpacity: null, layerOpacity: 1, layerDy: 0 };
-  if (t <= 0) return { glyphOpacity: null, layerOpacity: 0, layerDy: fontPx * 0.35 };
+  if (!animationId || t >= 1) {
+    return {
+      glyphOpacity: null,
+      layerOpacity: 1,
+      layerDy: 0,
+      layerScale: 1,
+      glowPulse: animationId === "neon" ? 1 : undefined,
+      slotOpacity: animationId === "staged" ? Array(slots).fill(1) : undefined,
+      slotDy: animationId === "staged" ? Array(slots).fill(0) : undefined,
+      cursorVisible: !!(animation?.cursor),
+    };
+  }
+  if (t <= 0) {
+    return {
+      glyphOpacity: null,
+      layerOpacity: 0,
+      layerDy: fontPx * 0.35,
+      layerScale: animation?.scaleFrom ?? 0.25,
+      layerBlur: fontPx * (animation?.blurFrom ?? 0.35),
+      slotOpacity: Array(slots).fill(0),
+    };
+  }
   switch (animationId) {
     case "slide_up": {
       const eased = easeOutCubic(t);
@@ -164,18 +213,113 @@ function entranceFrame(
         text,
         animation?.staggerBy ?? TYPEWRITER_ANIMATION_DEFAULTS.staggerBy,
       );
+      const glyphOpacity = byLine
+        ? staggeredOpacitiesByLine(glyphs, t, true, overlap)
+        : staggeredOpacities(glyphCount, t, true, overlap);
+      const visible = glyphOpacity.filter((o) => o > 0).length;
+      const blinkHz = animation?.cursorBlinkHz ?? 2;
+      const cursorVisible = !!(
+        animation?.cursor &&
+        (visible < glyphCount || Math.sin(t * Math.PI * 2 * blinkHz) > 0)
+      );
+      return { glyphOpacity, layerOpacity: 1, layerDy: 0, cursorVisible };
+    }
+    case "fade": {
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      return { glyphOpacity: null, layerOpacity: eased, layerDy: 0 };
+    }
+    case "pop": {
+      const bounce = animation?.bounce ?? POP_ANIMATION_DEFAULTS.bounce;
+      const from = animation?.scaleFrom ?? POP_ANIMATION_DEFAULTS.scaleFrom;
+      const raw = easeOutBack(t, bounce);
+      let scale = from + (1 - from) * Math.min(1 + bounce, Math.max(0, raw));
+      if (t > 0.85) scale = scale + (1 - scale) * ((t - 0.85) / 0.15);
+      const shakeAmp = (animation?.shake ?? 0) * fontPx;
+      const shake = t < 0.55 ? Math.sin(t * Math.PI * 10) * shakeAmp * (1 - t) : 0;
       return {
-        glyphOpacity: byLine
-          ? staggeredOpacitiesByLine(glyphs, t, true, overlap)
-          : staggeredOpacities(glyphCount, t, true, overlap),
+        glyphOpacity: null,
+        layerOpacity: easeOutCubic(Math.min(1, t / 0.35)),
+        layerDy: 0,
+        layerDx: shake,
+        layerScale: scale,
+      };
+    }
+    case "kinetic": {
+      const overlap =
+        animation?.staggerOverlap ?? KINETIC_ANIMATION_DEFAULTS.staggerOverlap;
+      return {
+        glyphOpacity: staggeredOpacities(glyphCount, t, false, overlap),
         layerOpacity: 1,
         layerDy: 0,
       };
     }
-    case "fade": {
-      // Whole line fades in together (same as the app's evaluateTextEntrance).
-      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      return { glyphOpacity: null, layerOpacity: eased, layerDy: 0 };
+    case "focus": {
+      const eased = easeOutCubic(t);
+      const from = animation?.scaleFrom ?? FOCUS_ANIMATION_DEFAULTS.scaleFrom;
+      const blurFrom = animation?.blurFrom ?? FOCUS_ANIMATION_DEFAULTS.blurFrom;
+      return {
+        glyphOpacity: null,
+        layerOpacity: eased,
+        layerDy: 0,
+        layerScale: from + (1 - from) * eased,
+        layerBlur: fontPx * blurFrom * (1 - eased),
+      };
+    }
+    case "staged": {
+      const stagger = animation?.slotStagger ?? STAGED_ANIMATION_DEFAULTS.slotStagger;
+      const window = 0.32;
+      const span = (1 - window) * Math.min(1, Math.max(0.05, stagger));
+      const slotOpacity: number[] = [];
+      const slotDy: number[] = [];
+      for (let i = 0; i < slots; i++) {
+        const start = slots === 1 ? 0 : (i / (slots - 1)) * span;
+        const local = Math.min(1, Math.max(0, (t - start) / window));
+        const eased = easeOutCubic(local);
+        slotOpacity.push(eased);
+        slotDy.push((1 - eased) * fontPx * 0.4);
+      }
+      return { glyphOpacity: null, layerOpacity: 1, layerDy: 0, slotOpacity, slotDy };
+    }
+    case "impact": {
+      const punch = animation?.punch ?? IMPACT_ANIMATION_DEFAULTS.punch;
+      const from = animation?.scaleFrom ?? IMPACT_ANIMATION_DEFAULTS.scaleFrom;
+      const eased = easeOutCubic(Math.min(1, t / 0.45));
+      let scale = 1;
+      if (t < 0.35) scale = from + (1 + punch - from) * eased;
+      else if (t < 0.55) scale = 1 + punch * (1 - (t - 0.35) / 0.2);
+      const shakeAmp = (animation?.shake ?? IMPACT_ANIMATION_DEFAULTS.shake) * fontPx;
+      const shake = t < 0.5 ? Math.sin(t * Math.PI * 16) * shakeAmp * (1 - t * 2) : 0;
+      return {
+        glyphOpacity: null,
+        layerOpacity: eased,
+        layerDy: (1 - eased) * fontPx * -0.15,
+        layerDx: shake,
+        layerScale: scale,
+      };
+    }
+    case "glitch": {
+      const amp = (animation?.glitchAmp ?? GLITCH_ANIMATION_DEFAULTS.glitchAmp) * fontPx;
+      const burst = t < 0.75;
+      const wave = Math.sin(t * Math.PI * 18) * (burst ? 1 : (1 - t) * 4);
+      return {
+        glyphOpacity: null,
+        layerOpacity: t < 0.1 ? t / 0.1 : 1,
+        layerDy: 0,
+        layerDx: wave * amp * 0.4,
+        rgbOffset: burst ? amp * (0.6 + 0.4 * Math.abs(wave)) : amp * (1 - t) * 0.5,
+      };
+    }
+    case "neon": {
+      const flicker = animation?.neonFlicker ?? NEON_ANIMATION_DEFAULTS.neonFlicker;
+      const ramp = easeOutCubic(t);
+      const noise = 0.5 + 0.5 * Math.sin(t * Math.PI * 14);
+      const pulse = ramp * (1 - flicker * 0.5 + flicker * 0.5 * noise);
+      return {
+        glyphOpacity: null,
+        layerOpacity: Math.max(0.15, ramp),
+        layerDy: 0,
+        glowPulse: Math.min(1.35, Math.max(0.2, pulse)),
+      };
     }
     default:
       return { glyphOpacity: null, layerOpacity: 1, layerDy: 0 };
@@ -402,7 +546,7 @@ function TornPaper({ paint }: { paint: BrushPaint }) {
   );
 }
 
-const ANIMATIONS = ["typewriter", "fade", "slide_up", "crawl"] as const;
+const ANIMATIONS = ENTRANCE_ANIMATION_IDS;
 
 export default function TextTab({ initialCatalog, view }: Props) {
   const [catalog, setCatalog] = useState(initialCatalog);
@@ -747,55 +891,30 @@ export default function TextTab({ initialCatalog, view }: Props) {
                 <select
                   value={selected.animation?.id ?? "fade"}
                   onChange={(e) => {
-                    const id = e.target.value as (typeof ANIMATIONS)[number];
-                    patchSelected({
-                      animation: {
-                        ...(selected.animation ?? {}),
-                        id,
-                        durationMs:
-                          id === "crawl"
-                            ? selected.animation?.durationMs ?? 18000
-                            : selected.animation?.durationMs,
-                        ...(id === "crawl"
-                          ? {
-                              staggerOverlap: undefined,
-                              staggerBy: undefined,
-                              tiltDeg:
-                                selected.animation?.tiltDeg ??
-                                CRAWL_ANIMATION_DEFAULTS.tiltDeg,
-                              perspective:
-                                selected.animation?.perspective ??
-                                CRAWL_ANIMATION_DEFAULTS.perspective,
-                              scrollStartFactor:
-                                selected.animation?.scrollStartFactor ??
-                                CRAWL_ANIMATION_DEFAULTS.scrollStartFactor,
-                              scrollEndFactor:
-                                selected.animation?.scrollEndFactor ??
-                                CRAWL_ANIMATION_DEFAULTS.scrollEndFactor,
-                            }
-                          : id === "typewriter"
-                            ? {
-                                staggerOverlap:
-                                  selected.animation?.staggerOverlap ??
-                                  TYPEWRITER_ANIMATION_DEFAULTS.staggerOverlap,
-                                staggerBy:
-                                  selected.animation?.staggerBy ??
-                                  TYPEWRITER_ANIMATION_DEFAULTS.staggerBy,
-                                tiltDeg: undefined,
-                                perspective: undefined,
-                                scrollStartFactor: undefined,
-                                scrollEndFactor: undefined,
-                              }
-                            : {
-                                staggerOverlap: undefined,
-                                staggerBy: undefined,
-                                tiltDeg: undefined,
-                                perspective: undefined,
-                                scrollStartFactor: undefined,
-                                scrollEndFactor: undefined,
-                              }),
-                      },
-                    });
+                    const id = e.target.value as TextEntranceAnimationId;
+                    const base: TextEntranceAnimation = {
+                      id,
+                      durationMs:
+                        id === "crawl"
+                          ? selected.animation?.durationMs ?? 18000
+                          : selected.animation?.durationMs ?? DEFAULT_ENTRANCE_MS,
+                    };
+                    if (id === "crawl") Object.assign(base, CRAWL_ANIMATION_DEFAULTS);
+                    if (id === "typewriter")
+                      Object.assign(base, TYPEWRITER_ANIMATION_DEFAULTS);
+                    if (id === "pop") Object.assign(base, POP_ANIMATION_DEFAULTS);
+                    if (id === "kinetic")
+                      Object.assign(base, KINETIC_ANIMATION_DEFAULTS);
+                    if (id === "focus")
+                      Object.assign(base, FOCUS_ANIMATION_DEFAULTS);
+                    if (id === "staged")
+                      Object.assign(base, STAGED_ANIMATION_DEFAULTS);
+                    if (id === "impact")
+                      Object.assign(base, IMPACT_ANIMATION_DEFAULTS);
+                    if (id === "glitch")
+                      Object.assign(base, GLITCH_ANIMATION_DEFAULTS);
+                    if (id === "neon") Object.assign(base, NEON_ANIMATION_DEFAULTS);
+                    patchSelected({ animation: base });
                   }}
                   style={ui.input}
                 >
@@ -877,7 +996,254 @@ export default function TextTab({ initialCatalog, view }: Props) {
                       <option value="glyph">glyph (글자 연속)</option>
                     </select>
                   </label>
+                  <label style={ui.fieldLabel}>
+                    커서 (cursor)
+                    <select
+                      value={selected.animation?.cursor ? "true" : "false"}
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            cursor: e.target.value === "true",
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    >
+                      <option value="false">off</option>
+                      <option value="true">on</option>
+                    </select>
+                  </label>
                 </>
+              )}
+              {(selected.animation?.id === "pop" ||
+                selected.animation?.id === "impact") && (
+                <>
+                  <label style={ui.fieldLabel}>
+                    bounce
+                    <input
+                      type="number"
+                      step={0.02}
+                      value={
+                        selected.animation?.bounce ??
+                        POP_ANIMATION_DEFAULTS.bounce
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            bounce: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    shake
+                    <input
+                      type="number"
+                      step={0.01}
+                      value={selected.animation?.shake ?? 0}
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            shake: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    scaleFrom
+                    <input
+                      type="number"
+                      step={0.05}
+                      value={
+                        selected.animation?.scaleFrom ??
+                        POP_ANIMATION_DEFAULTS.scaleFrom
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            scaleFrom: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                </>
+              )}
+              {selected.animation?.id === "focus" && (
+                <>
+                  <label style={ui.fieldLabel}>
+                    scaleFrom
+                    <input
+                      type="number"
+                      step={0.05}
+                      value={
+                        selected.animation?.scaleFrom ??
+                        FOCUS_ANIMATION_DEFAULTS.scaleFrom
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            scaleFrom: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    blurFrom
+                    <input
+                      type="number"
+                      step={0.05}
+                      value={
+                        selected.animation?.blurFrom ??
+                        FOCUS_ANIMATION_DEFAULTS.blurFrom
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            blurFrom: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                </>
+              )}
+              {selected.animation?.id === "kinetic" && (
+                <>
+                  <label style={ui.fieldLabel}>
+                    kineticAmp
+                    <input
+                      type="number"
+                      step={0.05}
+                      value={
+                        selected.animation?.kineticAmp ??
+                        KINETIC_ANIMATION_DEFAULTS.kineticAmp
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            kineticAmp: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    kineticRotDeg
+                    <input
+                      type="number"
+                      step={1}
+                      value={
+                        selected.animation?.kineticRotDeg ??
+                        KINETIC_ANIMATION_DEFAULTS.kineticRotDeg
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            kineticRotDeg: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                </>
+              )}
+              {selected.animation?.id === "staged" && (
+                <label style={ui.fieldLabel}>
+                  slotStagger
+                  <input
+                    type="number"
+                    step={0.05}
+                    min={0.05}
+                    max={1}
+                    value={
+                      selected.animation?.slotStagger ??
+                      STAGED_ANIMATION_DEFAULTS.slotStagger
+                    }
+                    onChange={(e) =>
+                      selected.animation &&
+                      patchSelected({
+                        animation: {
+                          ...selected.animation,
+                          slotStagger: Number(e.target.value),
+                        },
+                      })
+                    }
+                    style={ui.input}
+                  />
+                </label>
+              )}
+              {selected.animation?.id === "glitch" && (
+                <label style={ui.fieldLabel}>
+                  glitchAmp
+                  <input
+                    type="number"
+                    step={0.01}
+                    value={
+                      selected.animation?.glitchAmp ??
+                      GLITCH_ANIMATION_DEFAULTS.glitchAmp
+                    }
+                    onChange={(e) =>
+                      selected.animation &&
+                      patchSelected({
+                        animation: {
+                          ...selected.animation,
+                          glitchAmp: Number(e.target.value),
+                        },
+                      })
+                    }
+                    style={ui.input}
+                  />
+                </label>
+              )}
+              {selected.animation?.id === "neon" && (
+                <label style={ui.fieldLabel}>
+                  neonFlicker
+                  <input
+                    type="number"
+                    step={0.05}
+                    value={
+                      selected.animation?.neonFlicker ??
+                      NEON_ANIMATION_DEFAULTS.neonFlicker
+                    }
+                    onChange={(e) =>
+                      selected.animation &&
+                      patchSelected({
+                        animation: {
+                          ...selected.animation,
+                          neonFlicker: Number(e.target.value),
+                        },
+                      })
+                    }
+                    style={ui.input}
+                  />
+                </label>
               )}
               <label style={ui.fieldLabel}>
                 줄 레이아웃 (layout.perLine)
@@ -1220,6 +1586,7 @@ function CompositionPreview({
     progress,
     fontPx,
     item.animation,
+    composition.slots.length,
   );
 
   const leftBar = composition.decorations?.find((d) => d.kind === "bar_v" && d.attach === "left");
@@ -1271,7 +1638,7 @@ function CompositionPreview({
               }}
             />
           )}
-          {composition.slots.map((slot) => {
+          {composition.slots.map((slot, si) => {
             const fs = fontPx * (slot.fontSizeFactor ?? 1);
             const below = composition.decorations?.find(
               (d) =>
@@ -1280,12 +1647,18 @@ function CompositionPreview({
                 (d.kind === "rule" || d.kind === "slash"),
             );
             const color = slot.fillColor != null ? argbHex(slot.fillColor) : accent;
+            const slotOp = frame.slotOpacity?.[si] ?? 1;
+            const slotDy = frame.slotDy?.[si] ?? 0;
             return (
               <div
                 key={slot.id}
                 style={{
                   marginLeft: (slot.dxFactor ?? 0) * fontPx,
                   textAlign: slot.align ?? align,
+                  opacity: slotOp,
+                  transform: `translateY(${slotDy}px)`,
+                  // Keep layout height for staged slots that are still invisible.
+                  visibility: "visible",
                 }}
               >
                 <span
@@ -1396,6 +1769,23 @@ function TextPreview({
   const crawlPerspectivePx = Math.round(
     1 / (item.animation?.perspective ?? CRAWL_ANIMATION_DEFAULTS.perspective),
   );
+  const layerTransform = [
+    `translate(${frame.layerDx ?? 0}px, ${frame.layerDy}px)`,
+    `scale(${frame.layerScale ?? 1})`,
+  ].join(" ");
+  const layerFilter = [
+    frame.layerBlur && frame.layerBlur > 0.5
+      ? `blur(${frame.layerBlur}px)`
+      : null,
+    frame.rgbOffset && Math.abs(frame.rgbOffset) > 0.5
+      ? `drop-shadow(${-frame.rgbOffset}px 0 0 rgba(255,0,80,0.55)) drop-shadow(${frame.rgbOffset}px 0 0 rgba(0,255,255,0.55))`
+      : null,
+    frame.glowPulse && frame.glowPulse !== 1
+      ? `brightness(${frame.glowPulse})`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const multiline = text.includes("\n");
   const isTypewriter = item.animation?.id === "typewriter";
@@ -1445,7 +1835,8 @@ function TextPreview({
             alignItems,
             gap: lineGap,
             opacity: frame.layerOpacity,
-            transform: `translateY(${frame.layerDy}px)`,
+            transform: layerTransform,
+            filter: layerFilter || undefined,
           }}
         >
           {lines.map((line, li) => {
@@ -1518,7 +1909,8 @@ function TextPreview({
         style={{
           ...box,
           opacity: frame.layerOpacity,
-          transform: `translateY(${frame.layerDy}px)`,
+          transform: layerTransform,
+          filter: layerFilter || undefined,
           whiteSpace: "pre-wrap",
           textAlign: layout.align ?? "center",
         }}
@@ -1530,6 +1922,10 @@ function TextPreview({
             position: "relative",
             zIndex: 1,
             whiteSpace: "pre-wrap",
+            textShadow:
+              frame.glowPulse && frame.glowPulse > 1
+                ? `0 0 ${fontPx * 0.35 * frame.glowPulse}px currentColor`
+                : undefined,
           }}
         >
           {frame.glyphOpacity
@@ -1543,6 +1939,9 @@ function TextPreview({
                 ),
               )
             : text}
+          {frame.cursorVisible ? (
+            <span style={{ opacity: 1, marginLeft: 2 }}>|</span>
+          ) : null}
         </span>
       </span>
     </div>

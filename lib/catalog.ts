@@ -11,6 +11,7 @@ export {
 } from "./text-composition";
 import type { TextComposition } from "./text-composition";
 import { compositionSampleText } from "./text-composition";
+import { CAPCUT_TEXT_TEMPLATES } from "./capcut-text-templates";
 
 export type TextStyleStroke = {
   widthFactor: number;
@@ -78,39 +79,62 @@ export type TextStyleTemplate = {
   preferredFontId?: string;
 };
 
+export type TextEntranceAnimationId =
+  | "typewriter"
+  | "fade"
+  | "slide_up"
+  | "crawl"
+  | "pop"
+  | "kinetic"
+  | "focus"
+  | "staged"
+  | "impact"
+  | "glitch"
+  | "neon";
+
 export type TextEntranceAnimation = {
-  id: "typewriter" | "fade" | "slide_up" | "crawl";
+  id: TextEntranceAnimationId;
   /** Entrance length, or recommended overlay span for continuous crawl. */
   durationMs?: number;
-  /**
-   * Typewriter only — how much neighbouring glyph windows overlap (0 = one
-   * after another, higher = more concurrent). Default 0.55.
-   */
+  /** Typewriter / kinetic — neighbouring glyph window overlap (0…0.95). */
   staggerOverlap?: number;
-  /**
-   * Typewriter only — `glyph` staggers every character; `line` finishes each
-   * line before the next (Hello… then World…). `auto` uses `line` when the
-   * sample has a newline. Default `auto`.
-   */
+  /** Typewriter — `glyph` | `line` | `auto`. */
   staggerBy?: "glyph" | "line" | "auto";
-  /**
-   * Crawl only — degrees of classic “bottom nearer / top into distance” tilt.
-   * Flutter applies the platform sign; dashboard CSS uses this value as-is.
-   * Default 54.
-   */
+  /** Crawl tilt degrees. */
   tiltDeg?: number;
-  /** Crawl only — Matrix4 / CSS perspective strength. Default 0.0012. */
   perspective?: number;
-  /** Crawl only — start translateY as × fontSize (positive = below). Default 14. */
   scrollStartFactor?: number;
-  /** Crawl only — end translateY as × fontSize (negative = above). Default -32. */
   scrollEndFactor?: number;
+  /** Pop / impact overshoot past 1.0. */
+  bounce?: number;
+  /** Shake amplitude as × fontSize. */
+  shake?: number;
+  /** Starting scale for pop / focus. */
+  scaleFrom?: number;
+  /** Focus starting blur as × fontSize. */
+  blurFrom?: number;
+  /** Typewriter caret. */
+  cursor?: boolean;
+  cursorBlinkHz?: number;
+  /** Kinetic per-glyph scale / rotation. */
+  kineticAmp?: number;
+  kineticRotDeg?: number;
+  /** Staged slot sequencing (0…1). */
+  slotStagger?: number;
+  /** Glitch RGB / jitter as × fontSize. */
+  glitchAmp?: number;
+  /** Neon flicker strength 0…1. */
+  neonFlicker?: number;
+  /** Impact punch scale above 1.0. */
+  punch?: number;
 };
 
 /** Defaults mirrored by the Flutter client when fields are omitted. */
 export const TYPEWRITER_ANIMATION_DEFAULTS = {
   staggerOverlap: 0.55,
   staggerBy: "auto" as const,
+  cursor: false,
+  cursorBlinkHz: 2,
 };
 
 export const CRAWL_ANIMATION_DEFAULTS = {
@@ -127,6 +151,56 @@ export const CREDITS_SCROLL_DEFAULTS = {
   scrollStartFactor: 12,
   scrollEndFactor: -28,
 } as const;
+
+export const POP_ANIMATION_DEFAULTS = {
+  bounce: 0.18,
+  shake: 0,
+  scaleFrom: 0.25,
+} as const;
+
+export const KINETIC_ANIMATION_DEFAULTS = {
+  staggerOverlap: 0.45,
+  kineticAmp: 0.55,
+  kineticRotDeg: 12,
+} as const;
+
+export const FOCUS_ANIMATION_DEFAULTS = {
+  scaleFrom: 0.85,
+  blurFrom: 0.35,
+} as const;
+
+export const STAGED_ANIMATION_DEFAULTS = {
+  slotStagger: 0.85,
+} as const;
+
+export const IMPACT_ANIMATION_DEFAULTS = {
+  punch: 0.12,
+  shake: 0.06,
+  bounce: 0.1,
+  scaleFrom: 0.7,
+} as const;
+
+export const GLITCH_ANIMATION_DEFAULTS = {
+  glitchAmp: 0.08,
+} as const;
+
+export const NEON_ANIMATION_DEFAULTS = {
+  neonFlicker: 0.35,
+} as const;
+
+export const ENTRANCE_ANIMATION_IDS: TextEntranceAnimationId[] = [
+  "typewriter",
+  "fade",
+  "slide_up",
+  "crawl",
+  "pop",
+  "kinetic",
+  "focus",
+  "staged",
+  "impact",
+  "glitch",
+  "neon",
+];
 
 /**
  * Pack kinds:
@@ -408,369 +482,8 @@ const MORE_EFFECTS: TextTemplatePackItem[] = [
   effect("effect_color_pop", "Color Pop", LOOK.colorPop),
 ];
 
-/** CapCut basic text-template benchmarks (composition = slots + decorations). */
-const CAPCUT_BASIC_TEMPLATES: TextTemplatePackItem[] = [
-  {
-    id: "tpl_daily_vlog",
-    title: "Daily Vlog",
-    kind: "template",
-    downloadSizeBytes: 0,
-    animation: { id: "fade", durationMs: 700 },
-    style: {
-      id: "tpl_daily_vlog",
-      label: "Daily Vlog",
-      fillColor: WHITE,
-      fillUseAccent: false,
-      preferredFontId: "gothicA1",
-    },
-    composition: {
-      align: "center",
-      gapFactor: 0.18,
-      slots: [
-        {
-          id: "eyebrow",
-          role: "eyebrow",
-          defaultText: "BY EASYCLIP",
-          fontSizeFactor: 0.32,
-          fontWeight: 600,
-          letterSpacingEm: 0.18,
-          fillColor: WHITE,
-        },
-        {
-          id: "title",
-          role: "title",
-          defaultText: "Daily Vlog",
-          fontSizeFactor: 1.05,
-          fontWeight: 800,
-          fillColor: WHITE,
-          preferredFontId: "doHyeon",
-        },
-      ],
-      decorations: [
-        {
-          id: "slash",
-          kind: "slash",
-          color: WHITE,
-          slotId: "title",
-          attach: "below",
-          thicknessFactor: 0.045,
-          lengthFactor: 0.55,
-          gapFactor: 0.2,
-        },
-      ],
-    },
-  },
-  {
-    id: "tpl_back",
-    title: "Back",
-    kind: "template",
-    downloadSizeBytes: 0,
-    animation: { id: "slide_up", durationMs: 650 },
-    style: {
-      id: "tpl_back",
-      label: "Back",
-      fillColor: WHITE,
-      fillUseAccent: false,
-      preferredFontId: "blackHanSans",
-      strokes: [
-        { widthFactor: 0.1, useAccent: false, color: BLACK },
-      ],
-    },
-    composition: {
-      align: "center",
-      gapFactor: 0.35,
-      slots: [
-        {
-          id: "title",
-          role: "title",
-          defaultText: "BACK",
-          fontSizeFactor: 1.35,
-          fontWeight: 900,
-          letterSpacingEm: 0.06,
-          fillColor: WHITE,
-          preferredFontId: "blackHanSans",
-        },
-      ],
-      decorations: [
-        {
-          id: "arrow",
-          kind: "chevron_down",
-          color: 0xffb0b0b0,
-          slotId: "title",
-          attach: "above",
-          widthFactor: 0.9,
-          heightFactor: 0.55,
-          gapFactor: 0.15,
-        },
-      ],
-    },
-  },
-  {
-    id: "tpl_trending_now",
-    title: "Trending Now",
-    kind: "template",
-    downloadSizeBytes: 0,
-    animation: { id: "slide_up", durationMs: 550 },
-    style: {
-      id: "tpl_trending_now",
-      label: "Trending Now",
-      fillColor: WHITE,
-      fillUseAccent: false,
-      preferredFontId: "blackHanSans",
-    },
-    composition: {
-      align: "start",
-      gapFactor: 0.08,
-      slots: [
-        {
-          id: "line1",
-          role: "title",
-          defaultText: "TRENDING",
-          fontSizeFactor: 0.95,
-          fontWeight: 900,
-          fillColor: WHITE,
-          align: "start",
-        },
-        {
-          id: "line2",
-          role: "title",
-          defaultText: "NOW",
-          fontSizeFactor: 0.95,
-          fontWeight: 900,
-          fillColor: WHITE,
-          align: "start",
-        },
-      ],
-      decorations: [
-        {
-          id: "accent",
-          kind: "bar_v",
-          color: 0xff2dd4bf,
-          attach: "left",
-          thicknessFactor: 0.22,
-          lengthFactor: 1,
-          gapFactor: 0.28,
-        },
-        {
-          id: "underline",
-          kind: "rule",
-          color: WHITE,
-          slotId: "line2",
-          attach: "below",
-          thicknessFactor: 0.04,
-          lengthFactor: 1,
-          gapFactor: 0.12,
-        },
-      ],
-    },
-  },
-  {
-    id: "tpl_bold_brave",
-    title: "Bold Brave",
-    kind: "template",
-    downloadSizeBytes: 0,
-    animation: { id: "typewriter", durationMs: 1100, staggerBy: "line" },
-    style: {
-      id: "tpl_bold_brave",
-      label: "Bold Brave",
-      fillColor: WHITE,
-      fillUseAccent: false,
-      preferredFontId: "notoSansKr",
-    },
-    composition: {
-      align: "start",
-      gapFactor: 0.12,
-      slots: [
-        {
-          id: "a",
-          role: "body",
-          defaultText: "Bold.",
-          fontSizeFactor: 0.85,
-          fontWeight: 600,
-          fillColor: WHITE,
-          align: "start",
-        },
-        {
-          id: "b",
-          role: "body",
-          defaultText: "Brave.",
-          fontSizeFactor: 0.85,
-          fontWeight: 500,
-          italic: true,
-          fillColor: WHITE,
-          align: "start",
-          dxFactor: 0.55,
-        },
-        {
-          id: "c",
-          role: "body",
-          defaultText: "Beautiful.",
-          fontSizeFactor: 0.9,
-          fontWeight: 700,
-          fillColor: WHITE,
-          align: "start",
-        },
-      ],
-    },
-  },
-  {
-    id: "tpl_title_simple",
-    title: "Title Simple",
-    kind: "template",
-    downloadSizeBytes: 0,
-    animation: { id: "fade", durationMs: 600 },
-    style: {
-      id: "tpl_title_simple",
-      label: "Title Simple",
-      fillColor: WHITE,
-      fillUseAccent: false,
-      preferredFontId: "gothicA1",
-    },
-    composition: {
-      align: "start",
-      gapFactor: 0.22,
-      slots: [
-        {
-          id: "title",
-          role: "title",
-          defaultText: "TITLE SIMPLE",
-          fontSizeFactor: 0.9,
-          fontWeight: 800,
-          fillColor: WHITE,
-          align: "start",
-        },
-        {
-          id: "subtitle",
-          role: "subtitle",
-          defaultText: "sub heading",
-          fontSizeFactor: 0.42,
-          fontWeight: 500,
-          fillColor: INK,
-          align: "start",
-          boxFillColor: WHITE,
-          boxPadHFactor: 0.35,
-          boxPadVFactor: 0.28,
-        },
-      ],
-      decorations: [
-        {
-          id: "orange",
-          kind: "bar_v",
-          color: 0xffff8a00,
-          attach: "right",
-          thicknessFactor: 0.2,
-          lengthFactor: 1,
-          gapFactor: 0.3,
-        },
-      ],
-    },
-  },
-  {
-    id: "tpl_archive_july",
-    title: "Archive",
-    kind: "template",
-    downloadSizeBytes: 0,
-    animation: { id: "fade", durationMs: 800 },
-    style: {
-      id: "tpl_archive_july",
-      label: "Archive",
-      fillColor: WHITE,
-      fillUseAccent: false,
-      preferredFontId: "blackHanSans",
-    },
-    composition: {
-      align: "center",
-      gapFactor: 0.2,
-      slots: [
-        {
-          id: "title",
-          role: "title",
-          defaultText: "ARCHIVE OF JULY",
-          fontSizeFactor: 0.78,
-          fontWeight: 900,
-          fillColor: WHITE,
-          preferredFontId: "blackHanSans",
-        },
-        {
-          id: "subtitle",
-          role: "subtitle",
-          defaultText: "short memory",
-          fontSizeFactor: 0.38,
-          fontWeight: 400,
-          italic: true,
-          letterSpacingEm: 0.12,
-          fillColor: WHITE,
-          preferredFontId: "gaegu",
-        },
-      ],
-      decorations: [
-        {
-          id: "divider",
-          kind: "rule",
-          color: WHITE,
-          slotId: "title",
-          attach: "below",
-          thicknessFactor: 0.035,
-          lengthFactor: 0.85,
-          gapFactor: 0.18,
-        },
-      ],
-    },
-  },
-];
-
-const MORE_TEMPLATES: TextTemplatePackItem[] = [
-  ...CAPCUT_BASIC_TEMPLATES,
-  template("pack_subtitle", "Subtitle", { id: "fade", durationMs: 400 }, LOOK.caption),
-  template("pack_typing", "Typing", { id: "typewriter", durationMs: 1000 }, {
-    fillColor: WHITE,
-    preferredFontId: "roboto",
-    lineBackground: capsule(INK, 0.85, 0.1),
-  }),
-  template("pack_breaking", "Breaking", { id: "slide_up", durationMs: 500 }, LOOK.news),
-  template("pack_marker", "Marker", { id: "typewriter", durationMs: 800 }, LOOK.highlight),
-  {
-    ...template("pack_memo", "Memo", { id: "typewriter", durationMs: 900 }, {
-      fillColor: 0xff3a2a10,
-      preferredFontId: "gaegu",
-      lineBackground: {
-        useAccent: false,
-        color: 0xffffe98a,
-        opacity: 1,
-        padHFactor: 0.42,
-        padVFactor: 0.32,
-        radiusFactor: 0.3,
-        shape: "brush",
-        shadowOpacity: 0.45,
-        shadowBlurFactor: 0.25,
-      },
-    }),
-    layout: { perLine: true, lineGapFactor: 0.12, align: "center" },
-  },
-  template("pack_neon_pink", "Neon Pink", { id: "fade", durationMs: 900 }, LOOK.neonPink),
-  template("pack_cyber", "Cyber", { id: "typewriter", durationMs: 700 }, LOOK.neonBlue),
-  template("pack_gold_title", "Gold Title", { id: "slide_up", durationMs: 800 }, LOOK.gold),
-  template("pack_hot", "Hot", { id: "slide_up", durationMs: 600 }, LOOK.fire),
-  template("pack_frost", "Frost", { id: "fade", durationMs: 1000 }, LOOK.ice),
-  template("pack_retro", "Retro", { id: "slide_up", durationMs: 600 }, LOOK.retro),
-  template("pack_comic", "Comic", { id: "typewriter", durationMs: 600 }, LOOK.comic),
-  template("pack_candy", "Candy", { id: "slide_up", durationMs: 500 }, LOOK.candy),
-  template("pack_sunset", "Sunset", { id: "fade", durationMs: 1000 }, LOOK.sunset),
-  template("pack_vlog", "Vlog", { id: "fade", durationMs: 700 }, {
-    fillColor: WHITE,
-    preferredFontId: "gothicA1",
-    shadow: softShadow(0.7, 0.35),
-  }),
-  template("pack_quote", "Quote", { id: "typewriter", durationMs: 1200 }, {
-    fillColor: WHITE,
-    preferredFontId: "gaegu",
-    shadow: softShadow(0.8, 0.3),
-  }),
-  template("pack_label", "Label", { id: "slide_up", durationMs: 500 }, {
-    fillColor: INK,
-    preferredFontId: "doHyeon",
-    lineBackground: capsule(WHITE, 1, 0.12),
-  }),
+/** Kept crawl templates + CapCut 30 (see capcut-text-templates.ts). */
+const KEEP_CRAWL_TEMPLATES: TextTemplatePackItem[] = [
   template(
     "tpl_star_wars_crawl",
     "Star Crawl",
@@ -795,10 +508,15 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
   ),
 ];
 
+const MORE_TEMPLATES: TextTemplatePackItem[] = [
+  ...KEEP_CRAWL_TEMPLATES,
+  ...CAPCUT_TEXT_TEMPLATES,
+];
+
 /**
  * Effects + templates served to the Flutter client.
  * - effects: static CapCut-style looks
- * - templates: look + entrance animation (Journal / Neon / Sticker)
+ * - templates: Journal / crawls / CapCut 30
  */
 /**
  * Text look access tiers. Credits are AI-only — these never cost credits.
@@ -808,20 +526,15 @@ export const PLUS_PACK_ITEM_IDS = new Set<string>([
   "effect_glow",
   "effect_color_pop",
   "effect_candy",
-  "pack_hot",
-  "pack_candy",
-  "pack_sunset",
-  "pack_breaking",
   // Formerly Pro — Plus-only catalog until Pro is sold.
   "effect_neon_pink",
   "effect_neon_blue",
   "effect_gold",
   "effect_fire",
   "effect_ice",
-  "pack_neon_pink",
-  "pack_cyber",
-  "pack_gold_title",
-  "pack_frost",
+  "tpl_glitch",
+  "tpl_neon",
+  "tpl_kinetic",
 ]);
 
 export const PRO_PACK_ITEM_IDS = new Set<string>([]);
@@ -959,65 +672,6 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
           },
         },
       },
-      {
-        id: "pack_neon_pulse",
-        title: "Neon",
-        kind: "template",
-        premium: false,
-        downloadSizeBytes: 0,
-        animation: { id: "fade", durationMs: 800 },
-        style: {
-          id: "pack_neon_pulse",
-          label: "Neon",
-          fillColor: 4294967295, // 0xFFFFFFFF
-          fillUseAccent: false,
-          preferredFontId: "blackHanSans",
-          strokes: [
-            { widthFactor: 0.18, useAccent: true },
-            { widthFactor: 0.08, useAccent: false, color: 4294967295 },
-          ],
-          glow: {
-            blurFactor: 0.7,
-            widthFactor: 0.28,
-            useAccent: true,
-            opacity: 0.95,
-          },
-          shadow: {
-            dxFactor: 0,
-            dyFactor: 0.02,
-            blurFactor: 0.18,
-            useAccent: false,
-            color: 4278190080,
-            opacity: 0.5,
-          },
-        },
-      },
-      {
-        id: "pack_sticker",
-        title: "Sticker",
-        kind: "template",
-        premium: false,
-        downloadSizeBytes: 0,
-        animation: { id: "slide_up", durationMs: 700 },
-        style: {
-          id: "pack_sticker",
-          label: "Sticker",
-          fillUseAccent: true,
-          preferredFontId: "blackHanSans",
-          strokes: [
-            { widthFactor: 0.26, useAccent: false, color: 4294967295 },
-            { widthFactor: 0.12, useAccent: false, color: 4279308561 }, // 0xFF111111
-          ],
-          shadow: {
-            dxFactor: 0.07,
-            dyFactor: 0.09,
-            blurFactor: 0,
-            useAccent: false,
-            color: 4278190080,
-            opacity: 0.85,
-          },
-        },
-      },
       ...MORE_TEMPLATES,
     ],
   },
@@ -1036,7 +690,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 14;
+export const TEXT_CATALOG_SEED_VERSION = 15;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;
@@ -1057,19 +711,23 @@ function withDefaultAnimationParams(
 ): TextTemplatePackItem {
   const animation = item.animation;
   if (!animation) return item;
-  if (animation.id === "typewriter") {
-    return {
-      ...item,
-      animation: { ...TYPEWRITER_ANIMATION_DEFAULTS, ...animation },
-    };
-  }
-  if (animation.id === "crawl") {
-    return {
-      ...item,
-      animation: { ...CRAWL_ANIMATION_DEFAULTS, ...animation },
-    };
-  }
-  return item;
+  const defaults: Record<string, Record<string, unknown>> = {
+    typewriter: TYPEWRITER_ANIMATION_DEFAULTS,
+    crawl: CRAWL_ANIMATION_DEFAULTS,
+    pop: POP_ANIMATION_DEFAULTS,
+    kinetic: KINETIC_ANIMATION_DEFAULTS,
+    focus: FOCUS_ANIMATION_DEFAULTS,
+    staged: STAGED_ANIMATION_DEFAULTS,
+    impact: IMPACT_ANIMATION_DEFAULTS,
+    glitch: GLITCH_ANIMATION_DEFAULTS,
+    neon: NEON_ANIMATION_DEFAULTS,
+  };
+  const base = defaults[animation.id];
+  if (!base) return item;
+  return {
+    ...item,
+    animation: { ...base, ...animation },
+  };
 }
 
 export function buildCatalog(baseUrl: string): TextTemplatePackCatalog {
