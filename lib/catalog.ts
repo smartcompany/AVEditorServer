@@ -47,6 +47,15 @@ export type TextStyleLineBackground = {
   shape?: TextStyleLineShape;
   shadowOpacity?: number;
   shadowBlurFactor?: number;
+  /** Bundled underlay (`text_packs/journal/paper_a.png`). */
+  underlayAsset?: string;
+  /** Remote underlay URL (absolute or site-relative). */
+  underlayUrl?: string;
+  /** Cycle per line for less repetition. */
+  underlayVariants?: string[];
+  grainAsset?: string;
+  /** Normalized nine-slice `{l,t,r,b}` 0…1 of source. */
+  nineSlice?: { l?: number; t?: number; r?: number; b?: number };
 };
 
 export type TextStyleFillGradient = {
@@ -907,12 +916,20 @@ export const PACK_CATEGORIES: TextTemplatePackCategory[] = [
             useAccent: false,
             color: 4294108364, // 0xFFF2E4CC
             opacity: 1,
-            padHFactor: 0.42,
-            padVFactor: 0.32,
+            padHFactor: 0.48,
+            padVFactor: 0.38,
             radiusFactor: 0.35,
             shape: "brush",
-            shadowOpacity: 0.55,
-            shadowBlurFactor: 0.28,
+            shadowOpacity: 0.45,
+            shadowBlurFactor: 0.22,
+            underlayAsset: "text_packs/journal/paper_a.png",
+            underlayUrl: "text_packs/journal/paper_a.png",
+            underlayVariants: [
+              "text_packs/journal/paper_a.png",
+              "text_packs/journal/paper_b.png",
+            ],
+            grainAsset: "text_packs/journal/grain.png",
+            nineSlice: { l: 0.2, t: 0.26, r: 0.2, b: 0.26 },
           },
         },
       },
@@ -993,7 +1010,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 1;
+export const TEXT_CATALOG_SEED_VERSION = 13;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;

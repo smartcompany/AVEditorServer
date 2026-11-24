@@ -241,9 +241,22 @@ function previewCss(style: TextStyleTemplate, accent: string, fontPx: number) {
     const shadowOpacity = bg.shadowOpacity ?? 0;
     const shadowBlur = Math.min(28, Math.max(2, (bg.shadowBlurFactor ?? 0.12) * fontPx));
     if (bg.shape === "brush") {
-      // Torn paper is drawn as an SVG path behind the text (TornPaper).
+      // Prefer pack underlay PNG (nine-slice); SVG path is legacy fallback.
       box.position = "relative";
-      brush = { color, shadowOpacity, shadowBlur, fontPx };
+      const underlay =
+        bg.underlayVariants?.[0] || bg.underlayUrl || bg.underlayAsset || null;
+      brush = {
+        color,
+        shadowOpacity,
+        shadowBlur,
+        fontPx,
+        underlaySrc: underlay
+          ? underlay.startsWith("http")
+            ? underlay
+            : `/${underlay.replace(/^\//, "")}`
+          : null,
+        nineSlice: bg.nineSlice ?? { l: 0.2, t: 0.26, r: 0.2, b: 0.26 },
+      };
     } else {
       // App: rounded rect, radius = fontSize × radiusFactor clamped to 4…12.
       box.background = color;
@@ -256,7 +269,14 @@ function previewCss(style: TextStyleTemplate, accent: string, fontPx: number) {
   return { text, box, brush };
 }
 
-type BrushPaint = { color: string; shadowOpacity: number; shadowBlur: number; fontPx: number };
+type BrushPaint = {
+  color: string;
+  shadowOpacity: number;
+  shadowBlur: number;
+  fontPx: number;
+  underlaySrc?: string | null;
+  nineSlice?: { l?: number; t?: number; r?: number; b?: number };
+};
 
 /**
  * Port of the app's _tornPaperPath: wavy torn top/bottom edges and jagged
@@ -301,11 +321,13 @@ function tornPaperPath(left: number, top: number, w: number, h: number): string 
   return parts.join(" ");
 }
 
-/** Torn-paper strip sized to its parent box: shadow, soft fringe, then fill. */
+/** Torn-paper strip: pack underlay nine-slice when present, else SVG path. */
 function TornPaper({ paint }: { paint: BrushPaint }) {
-  const ref = useRef<SVGSVGElement | null>(null);
+  const ref = useRef<HTMLDivElement | SVGSVGElement | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const filterId = useMemo(() => `torn${Math.random().toString(36).slice(2, 8)}`, []);
   useEffect(() => {
+    if (paint.underlaySrc) return;
     const parent = ref.current?.parentElement;
     if (!parent) return;
     const measure = () => setSize({ w: parent.offsetWidth, h: parent.offsetHeight });
@@ -313,21 +335,51 @@ function TornPaper({ paint }: { paint: BrushPaint }) {
     const ro = new ResizeObserver(measure);
     ro.observe(parent);
     return () => ro.disconnect();
-  }, []);
+  }, [paint.underlaySrc]);
+
+  if (paint.underlaySrc) {
+    const ns = paint.nineSlice ?? { l: 0.2, t: 0.26, r: 0.2, b: 0.26 };
+    // Approximate nine-slice with border-image (640×160 source).
+    const sw = 640;
+    const sh = 160;
+    const slice = `${Math.round(sh * (ns.t ?? 0.26))} ${Math.round(sw * (ns.r ?? 0.2))} ${Math.round(sh * (ns.b ?? 0.26))} ${Math.round(sw * (ns.l ?? 0.2))}`;
+    return (
+      <div
+        ref={ref as React.RefObject<HTMLDivElement>}
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          borderStyle: "solid",
+          borderColor: "transparent",
+          borderWidth: `${Math.max(8, paint.fontPx * 0.35)}px ${Math.max(12, paint.fontPx * 0.55)}px`,
+          borderImageSource: `url(${paint.underlaySrc})`,
+          borderImageSlice: `${slice} fill`,
+          borderImageRepeat: "stretch",
+          filter:
+            paint.shadowOpacity > 0
+              ? `drop-shadow(0 ${paint.fontPx * 0.045}px ${paint.shadowBlur}px rgba(0,0,0,${paint.shadowOpacity}))`
+              : undefined,
+        }}
+      />
+    );
+  }
+
   const d = size ? tornPaperPath(0, 0, size.w, size.h) : "";
   const fringeBlur = Math.min(10, Math.max(1.2, paint.fontPx * 0.08));
-  const id = useMemo(() => `torn${Math.random().toString(36).slice(2, 8)}`, []);
   return (
     <svg
-      ref={ref}
+      ref={ref as React.RefObject<SVGSVGElement>}
       aria-hidden
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible", zIndex: 0 }}
     >
       <defs>
-        <filter id={`${id}s`} x="-50%" y="-50%" width="200%" height="200%">
+        <filter id={`${filterId}s`} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation={paint.shadowBlur / 2} />
         </filter>
-        <filter id={`${id}f`} x="-50%" y="-50%" width="200%" height="200%">
+        <filter id={`${filterId}f`} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation={fringeBlur / 2} />
         </filter>
       </defs>
@@ -338,10 +390,10 @@ function TornPaper({ paint }: { paint: BrushPaint }) {
               d={d}
               transform={`translate(0 ${paint.fontPx * 0.045})`}
               fill={`rgba(0,0,0,${paint.shadowOpacity})`}
-              filter={`url(#${id}s)`}
+              filter={`url(#${filterId}s)`}
             />
           )}
-          <path d={d} fill={paint.color} opacity={0.55} filter={`url(#${id}f)`} />
+          <path d={d} fill={paint.color} opacity={0.55} filter={`url(#${filterId}f)`} />
           <path d={d} fill={paint.color} />
         </>
       )}
