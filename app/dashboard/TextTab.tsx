@@ -10,18 +10,22 @@ import type {
   TextTemplatePackItem,
 } from "@/lib/catalog";
 import {
+  BLUR_SLIDE_ANIMATION_DEFAULTS,
   CRAWL_ANIMATION_DEFAULTS,
   DEFAULT_EFFECT_SAMPLE_TEXT,
   DEFAULT_TEMPLATE_SAMPLE_TEXT,
+  DISSOLVE_ANIMATION_DEFAULTS,
   ENTRANCE_ANIMATION_IDS,
   FOCUS_ANIMATION_DEFAULTS,
   GLITCH_ANIMATION_DEFAULTS,
   IMPACT_ANIMATION_DEFAULTS,
   KINETIC_ANIMATION_DEFAULTS,
+  MARQUEE_ANIMATION_DEFAULTS,
   NEON_ANIMATION_DEFAULTS,
   POP_ANIMATION_DEFAULTS,
   STAGED_ANIMATION_DEFAULTS,
   TYPEWRITER_ANIMATION_DEFAULTS,
+  WAVE_ANIMATION_DEFAULTS,
   compositionEntriesFor,
   compositionPaintedSlotCount,
   compositionSampleText,
@@ -129,6 +133,7 @@ function staggeredOpacitiesByLine(
 
 type EntranceFrame = {
   glyphOpacity: number[] | null;
+  glyphDy?: number[] | null;
   layerOpacity: number;
   layerDy: number;
   layerDx?: number;
@@ -141,6 +146,7 @@ type EntranceFrame = {
   slotDy?: number[];
   crawlTiltDeg?: number;
   crawlScrollY?: number;
+  highlightProgress?: number;
 };
 
 function easeOutBack(t: number, overshoot: number): number {
@@ -181,6 +187,34 @@ function entranceFrame(
       crawlScrollY: startY + (endY - startY) * t,
     };
   }
+  if (animationId === "marquee") {
+    const startF =
+      animation?.scrollStartFactor ?? MARQUEE_ANIMATION_DEFAULTS.scrollStartFactor;
+    const endF =
+      animation?.scrollEndFactor ?? MARQUEE_ANIMATION_DEFAULTS.scrollEndFactor;
+    return {
+      glyphOpacity: null,
+      layerOpacity: 1,
+      layerDy: 0,
+      layerDx: fontPx * (startF + (endF - startF) * t),
+    };
+  }
+  if (animationId === "wave") {
+    const amp =
+      fontPx *
+      (animation?.kineticAmp ?? WAVE_ANIMATION_DEFAULTS.kineticAmp);
+    const phase =
+      0.55 + (animation?.staggerOverlap ?? WAVE_ANIMATION_DEFAULTS.staggerOverlap);
+    const glyphDy = glyphs.map((g, i) =>
+      g === "\n" ? 0 : Math.sin(t * Math.PI * 2 + i * phase) * amp,
+    );
+    return {
+      glyphOpacity: glyphs.map(() => 1),
+      glyphDy,
+      layerOpacity: 1,
+      layerDy: 0,
+    };
+  }
   if (!animationId || t >= 1) {
     return {
       glyphOpacity: null,
@@ -191,6 +225,7 @@ function entranceFrame(
       slotOpacity: animationId === "staged" ? Array(slots).fill(1) : undefined,
       slotDy: animationId === "staged" ? Array(slots).fill(0) : undefined,
       cursorVisible: !!(animation?.cursor),
+      highlightProgress: animationId === "karaoke" ? 1 : undefined,
     };
   }
   if (t <= 0) {
@@ -331,6 +366,64 @@ function entranceFrame(
         glowPulse: Math.min(1.35, Math.max(0.2, pulse)),
       };
     }
+    case "blur_slide": {
+      const eased = easeOutCubic(t);
+      const travel =
+        fontPx *
+        (animation?.scrollStartFactor ??
+          BLUR_SLIDE_ANIMATION_DEFAULTS.scrollStartFactor);
+      const blurFrom =
+        animation?.blurFrom ?? BLUR_SLIDE_ANIMATION_DEFAULTS.blurFrom;
+      return {
+        glyphOpacity: null,
+        layerOpacity: eased,
+        layerDy: 0,
+        layerDx: (1 - eased) * -travel,
+        layerBlur: (1 - eased) * fontPx * blurFrom,
+      };
+    }
+    case "dissolve": {
+      const overlap =
+        animation?.staggerOverlap ?? DISSOLVE_ANIMATION_DEFAULTS.staggerOverlap;
+      const amp =
+        fontPx *
+        (animation?.kineticAmp ?? DISSOLVE_ANIMATION_DEFAULTS.kineticAmp);
+      const content = glyphs.filter((g) => g !== "\n");
+      const n = content.length;
+      let gi = 0;
+      const glyphOpacity: number[] = [];
+      const glyphDy: number[] = [];
+      for (const g of glyphs) {
+        if (g === "\n") {
+          glyphOpacity.push(1);
+          glyphDy.push(0);
+          continue;
+        }
+        const start = n <= 1 ? 0 : (gi / (n - 1)) * (1 - overlap);
+        const local = Math.min(1, Math.max(0, (t - start) / (overlap + 0.2)));
+        const eased = easeOutCubic(local);
+        const scatter = 1 - eased;
+        glyphOpacity.push(local);
+        glyphDy.push(-scatter * amp * 0.7);
+        gi++;
+      }
+      return {
+        glyphOpacity,
+        glyphDy,
+        layerOpacity: 1,
+        layerDy: 0,
+      };
+    }
+    case "karaoke": {
+      const eased =
+        t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      return {
+        glyphOpacity: null,
+        layerOpacity: 1,
+        layerDy: 0,
+        highlightProgress: eased,
+      };
+    }
     default:
       return { glyphOpacity: null, layerOpacity: 1, layerDy: 0 };
   }
@@ -428,7 +521,13 @@ function previewCss(style: TextStyleTemplate, accent: string, fontPx: number) {
       }
     }
   }
-  return { text, box, brush };
+  return {
+    text,
+    box,
+    brush,
+    mirrorReflection: !!style.mirrorReflection,
+    mirrorGapFactor: style.mirrorGapFactor ?? 0.18,
+  };
 }
 
 type BrushPaint = {
@@ -591,8 +690,12 @@ export default function TextTab({ initialCatalog, view }: Props) {
   const [playing, setPlaying] = useState(false);
   const rafRef = useRef<number | null>(null);
   const animationMs = selected?.animation?.durationMs ?? DEFAULT_ENTRANCE_MS;
+  const loopsContinuous =
+    selected?.animation?.id === "crawl" ||
+    selected?.animation?.id === "marquee" ||
+    selected?.animation?.id === "wave";
 
-  // Templates: selecting an item plays the entrance once. Effects stay settled.
+  // Templates: selecting an item plays the entrance once (continuous loops).
   useEffect(() => {
     if (view !== "templates" || !selected?.id) {
       setPlaying(false);
@@ -614,6 +717,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
       setPlayProgress((p) => {
         const next = p + dt / Math.max(100, animationMs);
         if (next >= 1) {
+          if (loopsContinuous) return next % 1;
           done = true;
           return 1;
         }
@@ -629,7 +733,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
     return () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [playing, animationMs]);
+  }, [playing, animationMs, loopsContinuous]);
 
   const play = () => {
     setPlayProgress(0);
@@ -2063,6 +2167,34 @@ function TextPreview({
     box = { ...box, clipPath: `inset(-20% ${hidden}% -20% -20%)` };
   }
 
+  const karaokeClip =
+    item.animation?.id === "karaoke" && frame.highlightProgress != null
+      ? Math.max(0, Math.min(100, frame.highlightProgress * 100))
+      : null;
+
+  const renderGlyphs = (opts?: { highlight?: boolean }) =>
+    frame.glyphOpacity
+      ? glyphs.map((g, i) =>
+          g === "\n" ? (
+            <br key={i} />
+          ) : (
+            <span
+              key={i}
+              style={{
+                opacity: frame.glyphOpacity![i],
+                display: "inline-block",
+                transform: frame.glyphDy
+                  ? `translateY(${frame.glyphDy[i] ?? 0}px)`
+                  : undefined,
+                color: opts?.highlight ? accent : undefined,
+              }}
+            >
+              {g}
+            </span>
+          ),
+        )
+      : text;
+
   return (
     <div style={styles.previewStage}>
       <span
@@ -2073,6 +2205,7 @@ function TextPreview({
           filter: layerFilter || undefined,
           whiteSpace: "pre-wrap",
           textAlign: layout.align ?? "center",
+          position: "relative",
         }}
       >
         {css.brush && <TornPaper paint={css.brush} />}
@@ -2088,21 +2221,47 @@ function TextPreview({
                 : undefined,
           }}
         >
-          {frame.glyphOpacity
-            ? glyphs.map((g, i) =>
-                g === "\n" ? (
-                  <br key={i} />
-                ) : (
-                  <span key={i} style={{ opacity: frame.glyphOpacity![i] }}>
-                    {g}
-                  </span>
-                ),
-              )
-            : text}
+          {karaokeClip != null ? (
+            <>
+              <span style={{ position: "relative" }}>{renderGlyphs()}</span>
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  color: accent,
+                  clipPath: `inset(-10% ${100 - karaokeClip}% -10% -10%)`,
+                  pointerEvents: "none",
+                }}
+              >
+                {renderGlyphs({ highlight: true })}
+              </span>
+            </>
+          ) : (
+            renderGlyphs()
+          )}
           {frame.cursorVisible ? (
             <span style={{ opacity: 1, marginLeft: 2 }}>|</span>
           ) : null}
         </span>
+        {css.mirrorReflection ? (
+          <span
+            aria-hidden
+            style={{
+              ...css.text,
+              display: "block",
+              marginTop: fontPx * css.mirrorGapFactor,
+              transform: "scaleY(-1)",
+              opacity: 0.35,
+              maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)",
+              WebkitMaskImage:
+                "linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)",
+              pointerEvents: "none",
+            }}
+          >
+            {text}
+          </span>
+        ) : null}
       </span>
     </div>
   );

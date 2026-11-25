@@ -85,6 +85,10 @@ export type TextStyleTemplate = {
   lineBackground?: TextStyleLineBackground;
   /** Flutter OverlayFonts id applied when the user picks this pack. */
   preferredFontId?: string;
+  /** Faded vertical flip below the glyphs (Mirror Text). */
+  mirrorReflection?: boolean;
+  /** Gap between baseline and mirrored copy as × fontSize. */
+  mirrorGapFactor?: number;
 };
 
 export type TextEntranceAnimationId =
@@ -98,7 +102,12 @@ export type TextEntranceAnimationId =
   | "staged"
   | "impact"
   | "glitch"
-  | "neon";
+  | "neon"
+  | "wave"
+  | "blur_slide"
+  | "dissolve"
+  | "marquee"
+  | "karaoke";
 
 export type TextEntranceAnimation = {
   id: TextEntranceAnimationId;
@@ -202,6 +211,30 @@ export const NEON_ANIMATION_DEFAULTS = {
   neonFlicker: 0.35,
 } as const;
 
+export const WAVE_ANIMATION_DEFAULTS = {
+  staggerOverlap: 0.55,
+  kineticAmp: 0.35,
+} as const;
+
+export const BLUR_SLIDE_ANIMATION_DEFAULTS = {
+  scrollStartFactor: 3.2,
+  blurFrom: 0.55,
+} as const;
+
+export const DISSOLVE_ANIMATION_DEFAULTS = {
+  staggerOverlap: 0.45,
+  kineticAmp: 0.55,
+} as const;
+
+export const MARQUEE_ANIMATION_DEFAULTS = {
+  scrollStartFactor: 8,
+  scrollEndFactor: -10,
+} as const;
+
+export const KARAOKE_ANIMATION_DEFAULTS = {
+  staggerOverlap: 0.35,
+} as const;
+
 export const ENTRANCE_ANIMATION_IDS: TextEntranceAnimationId[] = [
   "typewriter",
   "fade",
@@ -214,6 +247,11 @@ export const ENTRANCE_ANIMATION_IDS: TextEntranceAnimationId[] = [
   "impact",
   "glitch",
   "neon",
+  "wave",
+  "blur_slide",
+  "dissolve",
+  "marquee",
+  "karaoke",
 ];
 
 /**
@@ -699,7 +737,7 @@ const MORE_EFFECTS: TextTemplatePackItem[] = [
   effect("effect_poster", "Poster", LOOK.poster),
 ];
 
-/** Kept crawl templates + CapCut 30 (see capcut-text-templates.ts). */
+/** Kept crawl templates + CapCut 47 (see capcut-text-templates.ts). */
 const KEEP_CRAWL_TEMPLATES: TextTemplatePackItem[] = [
   template(
     "tpl_star_wars_crawl",
@@ -733,7 +771,7 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
 /**
  * Effects + templates served to the Flutter client.
  * - effects: static CapCut-style looks
- * - templates: Journal / crawls / CapCut 30
+ * - templates: Journal / crawls / CapCut 47
  */
 /**
  * Text look access tiers. Credits are AI-only — these never cost credits.
@@ -914,7 +952,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 19;
+export const TEXT_CATALOG_SEED_VERSION = 20;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;
@@ -945,6 +983,11 @@ function withDefaultAnimationParams(
     impact: IMPACT_ANIMATION_DEFAULTS,
     glitch: GLITCH_ANIMATION_DEFAULTS,
     neon: NEON_ANIMATION_DEFAULTS,
+    wave: WAVE_ANIMATION_DEFAULTS,
+    blur_slide: BLUR_SLIDE_ANIMATION_DEFAULTS,
+    dissolve: DISSOLVE_ANIMATION_DEFAULTS,
+    marquee: MARQUEE_ANIMATION_DEFAULTS,
+    karaoke: KARAOKE_ANIMATION_DEFAULTS,
   };
   const base = defaults[animation.id];
   if (!base) return item;

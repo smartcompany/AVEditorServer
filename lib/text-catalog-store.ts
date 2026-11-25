@@ -103,9 +103,10 @@ export function mergeSeedIntoCatalog(
 /**
  * Text effects + templates for Flutter and the dashboard.
  *
- * Supabase Storage (`text_packs/catalog.json`) wins wholesale once its
- * version is ≥ the code seed — no additive id-merge (deletes/edits stick).
- * Seed is used when Storage is empty, unreachable, or older than the seed.
+ * Supabase Storage (`text_packs/catalog.json`) wins when its version is ≥ the
+ * code seed (dashboard edits stick). Missing seed ids are still merged in so
+ * new code-side templates appear without wiping Storage edits. Seed alone is
+ * used when Storage is empty, unreachable, or older than the seed.
  */
 export async function getTextPackCatalog(
   origin: string,
@@ -127,7 +128,7 @@ export async function getTextPackCatalog(
     const parsed: unknown = await res.json();
     if (!isCatalogShape(parsed)) return seed;
     if (parsed.version < TEXT_CATALOG_SEED_VERSION) return seed;
-    return withBaseUrl(parsed, origin);
+    return mergeSeedIntoCatalog(withBaseUrl(parsed, origin), seed);
   } catch (error) {
     console.warn("[text-packs] Storage read failed, using seed:", error);
     return seed;
