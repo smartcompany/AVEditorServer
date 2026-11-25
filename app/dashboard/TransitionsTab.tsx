@@ -387,11 +387,12 @@ export default function TransitionsTab({ initialCatalog }: Props) {
     [catalog.items, selectedId],
   );
 
+  // Selecting a left-menu item resets params and plays the preview once.
   useEffect(() => {
     if (!selected) return;
     setParams(defaultParams(selected));
     setProgress(0);
-    setPlaying(false);
+    setPlaying(true);
   }, [selected?.id]);
 
   useEffect(() => {
