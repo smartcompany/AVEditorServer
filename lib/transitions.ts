@@ -2139,13 +2139,15 @@ const BASIC: TransitionItemDto[] = [
 /**
  * Effect access tiers (CapCut-style). Credits are AI-only — these never
  * cost credits. Plus unlocks Plus; Pro/Studio unlock Plus + Pro.
+ *
+ * Policy: simple fades / wipes / slides / zooms stay free. 3D, puzzle,
+ * glitch, whip, squeeze, and other stylized motion are Plus.
  */
 export const PLUS_TRANSITION_IDS = new Set<string>([
   "spinin",
   "spinout",
   "doorway",
   "swap",
-  // Formerly Pro — Plus-only catalog until Pro is sold.
   "cube",
   "mosaic",
   "puzzleleft",
@@ -2160,6 +2162,10 @@ export const PLUS_TRANSITION_IDS = new Set<string>([
   "tiles",
   "roll",
   "stamp",
+  "whipleft",
+  "whipright",
+  "squeezeh",
+  "squeezev",
 ]);
 
 export const PRO_TRANSITION_IDS = new Set<string>([]);
@@ -2180,8 +2186,11 @@ for (const item of BASIC) {
   item.premium = accessTier !== "free";
 }
 
+/** Seed catalog version. Bump when seed tiers / items change. */
+export const TRANSITION_CATALOG_SEED_VERSION = 2;
+
 export const TRANSITION_CATALOG: TransitionCatalogDto = {
-  version: 0,
+  version: TRANSITION_CATALOG_SEED_VERSION,
   baseUrl: "",
   categories: [
     {

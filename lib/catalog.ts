@@ -776,27 +776,55 @@ const MORE_TEMPLATES: TextTemplatePackItem[] = [
 /**
  * Text look access tiers. Credits are AI-only — these never cost credits.
  * Plus unlocks Plus; Pro/Studio unlock Plus + Pro.
+ *
+ * Policy: everyday / casual looks stay free. Neon, metallic, cinematic,
+ * broadcast, and specialty motion packs are Plus.
  */
 export const PLUS_PACK_ITEM_IDS = new Set<string>([
+  // Effects — neon / metallic / specialty polish
   "effect_glow",
   "effect_color_pop",
   "effect_candy",
-  // Formerly Pro — Plus-only catalog until Pro is sold.
   "effect_neon_pink",
   "effect_neon_blue",
-  "effect_gold",
-  "effect_fire",
-  "effect_ice",
   "effect_neon_purple",
   "effect_neon_green",
-  "effect_cyber",
-  "effect_graffiti",
+  "effect_neon_orange",
+  "effect_gold",
+  "effect_bronze",
   "effect_chrome",
   "effect_emerald",
+  "effect_fire",
+  "effect_ice",
+  "effect_cyber",
+  "effect_graffiti",
   "effect_rainbow",
+  "effect_comic",
+  "effect_poster",
+  // Templates — cinematic / broadcast / advanced motion
+  "tpl_kinetic",
   "tpl_glitch",
   "tpl_neon",
-  "tpl_kinetic",
+  "tpl_star_wars_crawl",
+  "tpl_credits_scroll",
+  "tpl_big_typography",
+  "tpl_newspaper",
+  "tpl_breaking_news",
+  "tpl_logo_intro",
+  "tpl_text_behind",
+  "tpl_mirror_text",
+  "tpl_wave_text",
+  "tpl_blur_slide",
+  "tpl_dissolve_text",
+  "tpl_3d_extruded",
+  "tpl_perspective_text",
+  "tpl_karaoke_highlight",
+  "tpl_news_ticker",
+  "tpl_lower_third",
+  "tpl_split_compare",
+  "tpl_be_in_a_book",
+  "tpl_product_launch",
+  "tpl_yearly_timeline",
 ]);
 
 export const PRO_PACK_ITEM_IDS = new Set<string>([]);
@@ -952,7 +980,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 20;
+export const TEXT_CATALOG_SEED_VERSION = 22;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;
