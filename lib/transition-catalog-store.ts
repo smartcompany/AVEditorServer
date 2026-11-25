@@ -132,11 +132,12 @@ export async function getTransitionCatalog(): Promise<TransitionCatalogDto> {
       console.warn("[transitions] Invalid Storage catalog shape, using seed");
       return normalizeCatalog(seed);
     }
-    // Older Storage catalog → prefer seed wholesale. Otherwise merge gaps.
+    // Older Storage → seed wholesale. Newer/equal Storage replaces seed as-is
+    // (no additive id-merge so dashboard deletes/edits stick).
     if (parsed.version < seed.version) {
       return normalizeCatalog(seed);
     }
-    return mergeSeedIntoCatalog(normalizeCatalog(parsed), seed);
+    return normalizeCatalog(parsed);
   } catch (error) {
     console.warn("[transitions] Storage read failed, using seed:", error);
     return normalizeCatalog(seed);
