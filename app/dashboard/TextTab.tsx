@@ -393,6 +393,13 @@ function previewCss(style: TextStyleTemplate, accent: string, fontPx: number) {
   if (bg) {
     const color = pick(bg.useAccent, bg.color, "#000", bg.opacity ?? 1);
     box.padding = `${(bg.padVFactor ?? 0.14) * fontPx}px ${(bg.padHFactor ?? 0.22) * fontPx}px`;
+    // Approx app overlayOpticalTextNudgeY (auto ≈ 0.08em when factor omitted).
+    const optical =
+      bg.opticalOffsetFactor == null ? 0.08 : bg.opticalOffsetFactor;
+    if (optical > 0) {
+      text.display = "inline-block";
+      text.transform = `translateY(-${optical * fontPx}px)`;
+    }
     const shadowOpacity = bg.shadowOpacity ?? 0;
     const shadowBlur = Math.min(28, Math.max(2, (bg.shadowBlurFactor ?? 0.12) * fontPx));
     if (bg.shape === "brush") {

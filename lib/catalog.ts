@@ -51,6 +51,11 @@ export type TextStyleLineBackground = {
   shape?: TextStyleLineShape;
   shadowOpacity?: number;
   shadowBlurFactor?: number;
+  /**
+   * Upward text nudge inside the strip as × fontSize.
+   * Omit for auto (ascent/descent asymmetry). 0 disables.
+   */
+  opticalOffsetFactor?: number;
   /** Bundled underlay (`text_packs/journal/paper_a.png`). */
   underlayAsset?: string;
   /** Remote underlay URL (absolute or site-relative). */
