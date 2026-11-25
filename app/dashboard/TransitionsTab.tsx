@@ -435,9 +435,13 @@ export default function TransitionsTab({ initialCatalog }: Props) {
   };
 
   /** Keep flat `items` and every category's item list in the same relative order. */
-  const reorderItems = (fromId: string, toId: string) => {
+  const reorderItems = (
+    fromId: string,
+    toId: string,
+    edge: "before" | "after",
+  ) => {
     setCatalog((prev) => {
-      const items = reorderById(prev.items, fromId, toId);
+      const items = reorderById(prev.items, fromId, toId, edge);
       const order = new Map(items.map((item, index) => [item.id, index]));
       const categories = prev.categories.map((cat) => ({
         ...cat,

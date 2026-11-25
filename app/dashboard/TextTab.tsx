@@ -585,10 +585,16 @@ export default function TextTab({ initialCatalog, view }: Props) {
   const rafRef = useRef<number | null>(null);
   const animationMs = selected?.animation?.durationMs ?? DEFAULT_ENTRANCE_MS;
 
+  // Templates: selecting an item plays the entrance once. Effects stay settled.
   useEffect(() => {
-    setPlaying(false);
-    setPlayProgress(1);
-  }, [selected?.id]);
+    if (view !== "templates" || !selected?.id) {
+      setPlaying(false);
+      setPlayProgress(1);
+      return;
+    }
+    setPlayProgress(0);
+    setPlaying(true);
+  }, [selected?.id, view]);
 
   useEffect(() => {
     if (!playing) return;
@@ -697,12 +703,13 @@ export default function TextTab({ initialCatalog, view }: Props) {
     categoryId: string,
     fromId: string,
     toId: string,
+    edge: "before" | "after",
   ) => {
     setCatalog((prev) => ({
       ...prev,
       categories: prev.categories.map((cat) =>
         cat.id === categoryId
-          ? { ...cat, items: reorderById(cat.items, fromId, toId) }
+          ? { ...cat, items: reorderById(cat.items, fromId, toId, edge) }
           : cat,
       ),
     }));
@@ -795,8 +802,8 @@ export default function TextTab({ initialCatalog, view }: Props) {
               </div>
               <SortableList
                 items={cat.items}
-                onReorder={(fromId, toId) =>
-                  reorderCategoryItems(cat.id, fromId, toId)
+                onReorder={(fromId, toId, edge) =>
+                  reorderCategoryItems(cat.id, fromId, toId, edge)
                 }
                 hint="⋮⋮ 드래그로 순서 변경 · 저장 후 앱에 반영"
                 renderItem={(item) => (
