@@ -21,6 +21,7 @@ import {
   easeInOutCubic,
   easeOutCubic,
 } from "@/lib/transition-layer-runtime";
+import { SortableList, reorderById } from "./SortableList";
 
 type Props = {
   initialCatalog: TransitionCatalogDto;
@@ -433,6 +434,22 @@ export default function TransitionsTab({ initialCatalog }: Props) {
     setStatus(null);
   };
 
+  /** Keep flat `items` and every category's item list in the same relative order. */
+  const reorderItems = (fromId: string, toId: string) => {
+    setCatalog((prev) => {
+      const items = reorderById(prev.items, fromId, toId);
+      const order = new Map(items.map((item, index) => [item.id, index]));
+      const categories = prev.categories.map((cat) => ({
+        ...cat,
+        items: [...cat.items].sort(
+          (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+        ),
+      }));
+      return { ...prev, items, categories };
+    });
+    setDirty(true);
+  };
+
   const updateLayer = (
     index: number,
     patch: Partial<TransitionLayerDto>,
@@ -680,43 +697,44 @@ export default function TransitionsTab({ initialCatalog }: Props) {
       <div style={styles.grid}>
         <aside style={styles.sidebar}>
           <h2 style={styles.sectionTitle}>Effects</h2>
-          <ul style={styles.list}>
-            {catalog.items.map((item) => {
+          <SortableList
+            items={catalog.items}
+            onReorder={reorderItems}
+            hint="⋮⋮ drag to reorder · Save to push order to the app"
+            renderItem={(item) => {
               const active = item.id === selected.id;
               return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectItem(item.id)}
-                    style={{
-                      ...styles.listBtn,
-                      ...(active ? styles.listBtnActive : {}),
-                    }}
-                  >
-                    <span style={styles.listTitle}>
-                      {itemTitle(item)}
-                      {(() => {
-                        const tier =
-                          item.accessTier ?? (item.premium ? "pro" : "free");
-                        if (tier === "plus") {
-                          return (
-                            <span style={{ ...styles.proBadge, background: "#2563EB" }}>
-                              PLUS
-                            </span>
-                          );
-                        }
-                        if (tier === "pro") {
-                          return <span style={styles.proBadge}>PRO</span>;
-                        }
-                        return null;
-                      })()}
-                    </span>
-                    <span style={styles.listId}>{item.id}</span>
-                  </button>
-                </li>
+                <button
+                  type="button"
+                  onClick={() => selectItem(item.id)}
+                  style={{
+                    ...styles.listBtn,
+                    ...(active ? styles.listBtnActive : {}),
+                  }}
+                >
+                  <span style={styles.listTitle}>
+                    {itemTitle(item)}
+                    {(() => {
+                      const tier =
+                        item.accessTier ?? (item.premium ? "pro" : "free");
+                      if (tier === "plus") {
+                        return (
+                          <span style={{ ...styles.proBadge, background: "#2563EB" }}>
+                            PLUS
+                          </span>
+                        );
+                      }
+                      if (tier === "pro") {
+                        return <span style={styles.proBadge}>PRO</span>;
+                      }
+                      return null;
+                    })()}
+                  </span>
+                  <span style={styles.listId}>{item.id}</span>
+                </button>
               );
-            })}
-          </ul>
+            }}
+          />
         </aside>
 
         <section style={styles.main}>

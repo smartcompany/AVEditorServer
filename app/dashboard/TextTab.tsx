@@ -27,6 +27,7 @@ import {
   compositionSampleText,
   type TextEntranceAnimationId,
 } from "@/lib/catalog";
+import { SortableList, reorderById } from "./SortableList";
 import { ui } from "./ui";
 
 type Props = {
@@ -692,6 +693,22 @@ export default function TextTab({ initialCatalog, view }: Props) {
     setDirty(true);
   };
 
+  const reorderCategoryItems = (
+    categoryId: string,
+    fromId: string,
+    toId: string,
+  ) => {
+    setCatalog((prev) => ({
+      ...prev,
+      categories: prev.categories.map((cat) =>
+        cat.id === categoryId
+          ? { ...cat, items: reorderById(cat.items, fromId, toId) }
+          : cat,
+      ),
+    }));
+    setDirty(true);
+  };
+
   const applyStyleJson = () => {
     if (!selected) return;
     try {
@@ -776,34 +793,43 @@ export default function TextTab({ initialCatalog, view }: Props) {
                   + 추가
                 </button>
               </div>
-              {cat.items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  style={{ ...ui.listBtn, ...(item.id === selected?.id ? ui.listBtnActive : {}) }}
-                >
-                  <span style={ui.listTitle}>
-                    {item.title}
-                    {(() => {
-                      const tier =
-                        item.accessTier ?? (item.premium ? "pro" : "free");
-                      if (tier === "plus") {
-                        return (
-                          <span style={{ ...ui.proBadge, background: "#2563EB" }}>
-                            PLUS
-                          </span>
-                        );
-                      }
-                      if (tier === "pro") {
-                        return <span style={ui.proBadge}>PRO</span>;
-                      }
-                      return null;
-                    })()}
-                  </span>
-                  <span style={ui.listId}>{item.id}</span>
-                </button>
-              ))}
+              <SortableList
+                items={cat.items}
+                onReorder={(fromId, toId) =>
+                  reorderCategoryItems(cat.id, fromId, toId)
+                }
+                hint="⋮⋮ 드래그로 순서 변경 · 저장 후 앱에 반영"
+                renderItem={(item) => (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(item.id)}
+                    style={{
+                      ...ui.listBtn,
+                      ...(item.id === selected?.id ? ui.listBtnActive : {}),
+                    }}
+                  >
+                    <span style={ui.listTitle}>
+                      {item.title}
+                      {(() => {
+                        const tier =
+                          item.accessTier ?? (item.premium ? "pro" : "free");
+                        if (tier === "plus") {
+                          return (
+                            <span style={{ ...ui.proBadge, background: "#2563EB" }}>
+                              PLUS
+                            </span>
+                          );
+                        }
+                        if (tier === "pro") {
+                          return <span style={ui.proBadge}>PRO</span>;
+                        }
+                        return null;
+                      })()}
+                    </span>
+                    <span style={ui.listId}>{item.id}</span>
+                  </button>
+                )}
+              />
             </div>
           ))}
         </aside>
