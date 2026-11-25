@@ -678,7 +678,23 @@ export default function TransitionsTab({ initialCatalog }: Props) {
         <div>
           <h1 style={styles.h1}>전환 효과</h1>
           <p style={styles.sub}>
-            Catalog v{catalog.version} · Storage-backed ·{" "}
+            Catalog v{catalog.version} · {catalog.items.length}개 · Plus{" "}
+            {
+              catalog.items.filter((i) => {
+                const tier =
+                  i.accessTier ?? (i.premium ? "pro" : "free");
+                return tier === "plus";
+              }).length
+            }
+            개 · Pro{" "}
+            {
+              catalog.items.filter((i) => {
+                const tier =
+                  i.accessTier ?? (i.premium ? "pro" : "free");
+                return tier === "pro";
+              }).length
+            }
+            개 · Storage-backed ·{" "}
             {dirty ? "unsaved changes" : "in sync"}
           </p>
         </div>
@@ -701,7 +717,9 @@ export default function TransitionsTab({ initialCatalog }: Props) {
 
       <div style={styles.grid}>
         <aside style={styles.sidebar}>
-          <h2 style={styles.sectionTitle}>Effects</h2>
+          <h2 style={styles.sectionTitle}>
+            Effects ({catalog.items.length})
+          </h2>
           <SortableList
             items={catalog.items}
             onReorder={reorderItems}
