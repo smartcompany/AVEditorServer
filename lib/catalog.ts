@@ -124,6 +124,10 @@ export type TextEntranceAnimation = {
   kineticRotDeg?: number;
   /** Staged slot sequencing (0…1). */
   slotStagger?: number;
+  /** Staged: each slot's local entrance window (0.15…0.6 of progress). */
+  slotWindow?: number;
+  /** Staged: rise distance as × fontSize (ease-out into place). */
+  riseFactor?: number;
   /** Glitch RGB / jitter as × fontSize. */
   glitchAmp?: number;
   /** Neon flicker strength 0…1. */
@@ -174,6 +178,8 @@ export const FOCUS_ANIMATION_DEFAULTS = {
 
 export const STAGED_ANIMATION_DEFAULTS = {
   slotStagger: 0.85,
+  slotWindow: 0.32,
+  riseFactor: 0.4,
 } as const;
 
 export const IMPACT_ANIMATION_DEFAULTS = {
@@ -693,7 +699,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 17;
+export const TEXT_CATALOG_SEED_VERSION = 19;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;

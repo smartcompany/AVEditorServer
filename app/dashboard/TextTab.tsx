@@ -269,16 +269,23 @@ function entranceFrame(
     }
     case "staged": {
       const stagger = animation?.slotStagger ?? STAGED_ANIMATION_DEFAULTS.slotStagger;
-      const window = 0.32;
+      const window = Math.min(
+        0.6,
+        Math.max(0.15, animation?.slotWindow ?? STAGED_ANIMATION_DEFAULTS.slotWindow),
+      );
+      const rise =
+        fontPx *
+        Math.min(1.2, Math.max(0.05, animation?.riseFactor ?? STAGED_ANIMATION_DEFAULTS.riseFactor));
       const span = (1 - window) * Math.min(1, Math.max(0.05, stagger));
       const slotOpacity: number[] = [];
       const slotDy: number[] = [];
       for (let i = 0; i < slots; i++) {
         const start = slots === 1 ? 0 : (i / (slots - 1)) * span;
         const local = Math.min(1, Math.max(0, (t - start) / window));
+        // Ease-out cubic: fast rise, slow settle (app parity).
         const eased = easeOutCubic(local);
         slotOpacity.push(eased);
-        slotDy.push((1 - eased) * fontPx * 0.4);
+        slotDy.push((1 - eased) * rise);
       }
       return { glyphOpacity: null, layerOpacity: 1, layerDy: 0, slotOpacity, slotDy };
     }
@@ -1177,29 +1184,81 @@ export default function TextTab({ initialCatalog, view }: Props) {
                 </>
               )}
               {selected.animation?.id === "staged" && (
-                <label style={ui.fieldLabel}>
-                  slotStagger
-                  <input
-                    type="number"
-                    step={0.05}
-                    min={0.05}
-                    max={1}
-                    value={
-                      selected.animation?.slotStagger ??
-                      STAGED_ANIMATION_DEFAULTS.slotStagger
-                    }
-                    onChange={(e) =>
-                      selected.animation &&
-                      patchSelected({
-                        animation: {
-                          ...selected.animation,
-                          slotStagger: Number(e.target.value),
-                        },
-                      })
-                    }
-                    style={ui.input}
-                  />
-                </label>
+                <>
+                  <label style={ui.fieldLabel}>
+                    slotStagger
+                    <input
+                      type="number"
+                      step={0.05}
+                      min={0.05}
+                      max={1}
+                      value={
+                        selected.animation?.slotStagger ??
+                        STAGED_ANIMATION_DEFAULTS.slotStagger
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            slotStagger: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    slotWindow (로컬 등장 구간)
+                    <input
+                      type="number"
+                      step={0.02}
+                      min={0.15}
+                      max={0.6}
+                      value={
+                        selected.animation?.slotWindow ??
+                        STAGED_ANIMATION_DEFAULTS.slotWindow
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            slotWindow: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <label style={ui.fieldLabel}>
+                    riseFactor (×fontSize, ease-out 상승)
+                    <input
+                      type="number"
+                      step={0.05}
+                      min={0.05}
+                      max={1.2}
+                      value={
+                        selected.animation?.riseFactor ??
+                        STAGED_ANIMATION_DEFAULTS.riseFactor
+                      }
+                      onChange={(e) =>
+                        selected.animation &&
+                        patchSelected({
+                          animation: {
+                            ...selected.animation,
+                            riseFactor: Number(e.target.value),
+                          },
+                        })
+                      }
+                      style={ui.input}
+                    />
+                  </label>
+                  <p style={ui.muted}>
+                    감속(ease-out cubic)은 엔진 고정입니다. slotWindow / riseFactor /
+                    slotStagger / durationMs 는 카탈로그 JSON으로 조절합니다.
+                  </p>
+                </>
               )}
               {selected.animation?.id === "glitch" && (
                 <label style={ui.fieldLabel}>
@@ -1400,7 +1459,7 @@ export default function TextTab({ initialCatalog, view }: Props) {
                   <h3 style={ui.h3}>Composition 슬롯</h3>
                   <p style={ui.muted}>
                     {selected.composition.repeatSlots
-                      ? "repeatSlots: 엔터(줄바꿈)마다 새 버블이 생기고, 아래 슬롯 스타일을 순서대로 순환합니다. (예: Chat Message = 파란 ↔ 회색)"
+                      ? "repeatSlots: 아래 슬롯은 순환 스타일(색/정렬)입니다. ▶ 재생에 보이는 문구는 바로 밑 ‘재생 본문’입니다."
                       : "줄바꿈이 슬롯에 1:1로 매핑되고, 남는 줄은 마지막 슬롯에 합쳐집니다. 대시보드·앱이 같은 composition JSON을 그립니다."}
                   </p>
                   <label
@@ -1426,12 +1485,30 @@ export default function TextTab({ initialCatalog, view }: Props) {
                     />
                     repeatSlots (줄마다 슬롯 스타일 순환)
                   </label>
+                  <label style={{ ...ui.fieldLabel, marginBottom: 12 }}>
+                    재생 본문 (sampleText) — ▶ Play 가 이 값을 그립니다
+                    <textarea
+                      value={
+                        selected.sampleText?.trim()
+                          ? selected.sampleText
+                          : compositionSampleText(selected.composition)
+                      }
+                      onChange={(e) =>
+                        patchSelected({
+                          sampleText: e.target.value || undefined,
+                        })
+                      }
+                      rows={selected.composition.repeatSlots ? 4 : 3}
+                      spellCheck={false}
+                      style={{ ...ui.input, minHeight: 72, fontFamily: "ui-monospace, monospace" }}
+                    />
+                  </label>
                   {selected.composition.slots.map((slot, idx) => (
                     <label key={slot.id} style={{ ...ui.fieldLabel, marginBottom: 8 }}>
                       슬롯 {slot.id} ({slot.role ?? "body"})
                       {selected.composition!.repeatSlots
-                        ? ` · ${idx + 1}/${selected.composition!.slots.length}번째 순환`
-                        : ""}
+                        ? ` · ${idx + 1}/${selected.composition!.slots.length}번째 순환 스타일`
+                        : " · defaultText"}
                       <input
                         value={slot.defaultText}
                         onChange={(e) => {
@@ -1442,10 +1519,16 @@ export default function TextTab({ initialCatalog, view }: Props) {
                             ...selected.composition!,
                             slots,
                           };
-                          patchSelected({
-                            composition,
-                            sampleText: compositionSampleText(composition),
-                          });
+                          // Fixed layouts: slot text IS the preview body.
+                          // repeatSlots: slot text is only a style sample — keep sampleText.
+                          patchSelected(
+                            selected.composition!.repeatSlots
+                              ? { composition }
+                              : {
+                                  composition,
+                                  sampleText: compositionSampleText(composition),
+                                },
+                          );
                         }}
                         style={ui.input}
                       />
@@ -1459,10 +1542,14 @@ export default function TextTab({ initialCatalog, view }: Props) {
                         try {
                           const composition = JSON.parse(e.target.value) as TextComposition;
                           if (!Array.isArray(composition.slots)) return;
-                          patchSelected({
-                            composition,
-                            sampleText: compositionSampleText(composition),
-                          });
+                          patchSelected(
+                            composition.repeatSlots
+                              ? { composition }
+                              : {
+                                  composition,
+                                  sampleText: compositionSampleText(composition),
+                                },
+                          );
                         } catch {
                           /* live typing */
                         }

@@ -101,8 +101,15 @@ export const CAPCUT_TEXT_TEMPLATES: TextTemplatePackItem[] = [
     title: "Chat Message",
     kind: "template",
     downloadSizeBytes: 0,
-    sampleText: "hey!\nyeah I'm free\nlet's go ☕",
-    animation: { id: "staged", durationMs: 1400, slotStagger: 0.9 },
+    // Matches the 2 cycle styles; add more lines in sampleText to preview extras.
+    sampleText: "hey!\nyeah I'm free",
+    animation: {
+      id: "staged",
+      durationMs: 1400,
+      slotStagger: 0.9,
+      slotWindow: 0.38,
+      riseFactor: 0.65,
+    },
     style: {
       id: "tpl_chat_message",
       label: "Chat Message",

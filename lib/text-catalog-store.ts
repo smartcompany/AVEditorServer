@@ -67,7 +67,11 @@ export function mergeSeedIntoCatalog(
         (!next.composition?.repeatSlots ||
           next.composition.slots.length !== seedItem.composition.slots.length)
       ) {
-        next = { ...next, composition: seedItem.composition };
+        next = {
+          ...next,
+          composition: seedItem.composition,
+          sampleText: seedItem.sampleText ?? next.sampleText,
+        };
       }
       return next;
     }),
