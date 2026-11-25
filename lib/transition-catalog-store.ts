@@ -46,12 +46,56 @@ export function normalizeCatalog(raw: TransitionCatalogDto): TransitionCatalogDt
 }
 
 /**
+ * Merge seed items missing from a saved catalog so new CapCut-style fills
+ * appear after a dashboard save without wiping edits. Storage wins on id.
+ */
+export function mergeSeedIntoCatalog(
+  stored: TransitionCatalogDto,
+  seed: TransitionCatalogDto,
+): TransitionCatalogDto {
+  const storedIds = new Set(stored.items.map((item) => item.id));
+  const missing = seed.items.filter((item) => !storedIds.has(item.id));
+  if (missing.length === 0) {
+    return normalizeCatalog({
+      ...stored,
+      version: Math.max(stored.version, seed.version),
+    });
+  }
+
+  const items = [...stored.items, ...missing];
+  const categories = (stored.categories ?? []).map((cat) => {
+    const seedCat = seed.categories.find((c) => c.id === cat.id);
+    if (!seedCat) return { ...cat, items: cat.items };
+    const catIds = new Set(cat.items.map((i) => i.id));
+    const add = seedCat.items.filter((i) => !catIds.has(i.id));
+    return add.length ? { ...cat, items: [...cat.items, ...add] } : cat;
+  });
+
+  for (const seedCat of seed.categories) {
+    if (!categories.some((c) => c.id === seedCat.id)) {
+      categories.push({
+        ...seedCat,
+        items: seedCat.items.filter((i) => missing.some((m) => m.id === i.id)),
+      });
+    }
+  }
+
+  return normalizeCatalog({
+    ...stored,
+    items,
+    categories,
+    version: Math.max(stored.version, seed.version),
+  });
+}
+
+/**
  * Load catalog from Supabase Storage. Falls back to the TypeScript seed when
- * Storage is empty/unavailable.
+ * Storage is empty/unavailable. Missing seed items are always merged in.
  */
 export async function getTransitionCatalog(): Promise<TransitionCatalogDto> {
+  const seed = buildTransitionCatalog();
   if (!hasSupabaseConfig()) {
-    return normalizeCatalog(buildTransitionCatalog());
+    return normalizeCatalog(seed);
   }
 
   try {
@@ -73,29 +117,29 @@ export async function getTransitionCatalog(): Promise<TransitionCatalogDto> {
 
     if (res.status === 404) {
       console.warn("[transitions] Storage miss, using seed");
-      return normalizeCatalog(buildTransitionCatalog());
+      return normalizeCatalog(seed);
     }
     if (!res.ok) {
       console.warn(
         "[transitions] Storage fetch failed, using seed:",
         res.status,
       );
-      return normalizeCatalog(buildTransitionCatalog());
+      return normalizeCatalog(seed);
     }
 
     const parsed: unknown = await res.json();
     if (!isCatalogShape(parsed)) {
       console.warn("[transitions] Invalid Storage catalog shape, using seed");
-      return normalizeCatalog(buildTransitionCatalog());
+      return normalizeCatalog(seed);
     }
-    // Code-side seed changes (e.g. new premium flags) win over an older save.
-    if (parsed.version < buildTransitionCatalog().version) {
-      return normalizeCatalog(buildTransitionCatalog());
+    // Older Storage catalog → prefer seed wholesale. Otherwise merge gaps.
+    if (parsed.version < seed.version) {
+      return normalizeCatalog(seed);
     }
-    return normalizeCatalog(parsed);
+    return mergeSeedIntoCatalog(normalizeCatalog(parsed), seed);
   } catch (error) {
     console.warn("[transitions] Storage read failed, using seed:", error);
-    return normalizeCatalog(buildTransitionCatalog());
+    return normalizeCatalog(seed);
   }
 }
 
