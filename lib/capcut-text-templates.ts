@@ -999,7 +999,7 @@ export const CAPCUT_TEXT_TEMPLATES: TextTemplatePackItem[] = [
     title: "Status",
     kind: "template",
     downloadSizeBytes: 0,
-    sampleText: "✈ AIRPLANE MODE ON",
+    sampleText: "✈️ AIRPLANE MODE ON",
     animation: { id: "fade", durationMs: 500 },
     style: {
       id: "tpl_status",
