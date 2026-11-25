@@ -60,6 +60,15 @@ export function mergeSeedIntoCatalog(
           },
         };
       }
+      // Pull newer composition structure from seed (e.g. Chat Message
+      // repeatSlots + 2-slot blue/grey cycle replacing a fixed 3-slot stack).
+      if (
+        seedItem?.composition?.repeatSlots &&
+        (!next.composition?.repeatSlots ||
+          next.composition.slots.length !== seedItem.composition.slots.length)
+      ) {
+        next = { ...next, composition: seedItem.composition };
+      }
       return next;
     }),
   }));

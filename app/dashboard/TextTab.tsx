@@ -1399,11 +1399,39 @@ export default function TextTab({ initialCatalog, view }: Props) {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <h3 style={ui.h3}>Composition 슬롯</h3>
                   <p style={ui.muted}>
-                    줄바꿈으로 슬롯이 매핑됩니다. 대시보드·앱이 같은 composition JSON을 그립니다.
+                    {selected.composition.repeatSlots
+                      ? "repeatSlots: 엔터(줄바꿈)마다 새 버블이 생기고, 아래 슬롯 스타일을 순서대로 순환합니다. (예: Chat Message = 파란 ↔ 회색)"
+                      : "줄바꿈이 슬롯에 1:1로 매핑되고, 남는 줄은 마지막 슬롯에 합쳐집니다. 대시보드·앱이 같은 composition JSON을 그립니다."}
                   </p>
+                  <label
+                    style={{
+                      ...ui.fieldLabel,
+                      marginBottom: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexDirection: "row",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!selected.composition.repeatSlots}
+                      onChange={(e) => {
+                        const composition: TextComposition = {
+                          ...selected.composition!,
+                          repeatSlots: e.target.checked || undefined,
+                        };
+                        patchSelected({ composition });
+                      }}
+                    />
+                    repeatSlots (줄마다 슬롯 스타일 순환)
+                  </label>
                   {selected.composition.slots.map((slot, idx) => (
                     <label key={slot.id} style={{ ...ui.fieldLabel, marginBottom: 8 }}>
                       슬롯 {slot.id} ({slot.role ?? "body"})
+                      {selected.composition!.repeatSlots
+                        ? ` · ${idx + 1}/${selected.composition!.slots.length}번째 순환`
+                        : ""}
                       <input
                         value={slot.defaultText}
                         onChange={(e) => {
