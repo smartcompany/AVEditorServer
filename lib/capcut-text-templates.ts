@@ -113,7 +113,7 @@ export const CAPCUT_TEXT_TEMPLATES: TextTemplatePackItem[] = [
     composition: {
       align: "start",
       gapFactor: 0.28,
-      // Enter adds another bubble; styles cycle blue / grey / blue / …
+      // Enter adds another bubble; styles alternate blue ↔ grey (2-slot cycle).
       repeatSlots: true,
       slots: [
         {
@@ -138,18 +138,6 @@ export const CAPCUT_TEXT_TEMPLATES: TextTemplatePackItem[] = [
           align: "end",
           dxFactor: 0.35,
           boxFillColor: 0xffe5e7eb,
-          boxPadHFactor: 0.45,
-          boxPadVFactor: 0.28,
-        },
-        {
-          id: "m3",
-          role: "body",
-          defaultText: "let's go ☕",
-          fontSizeFactor: 0.55,
-          fontWeight: 500,
-          fillColor: WHITE,
-          align: "start",
-          boxFillColor: 0xff3b82f6,
           boxPadHFactor: 0.45,
           boxPadVFactor: 0.28,
         },

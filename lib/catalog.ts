@@ -693,7 +693,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 16;
+export const TEXT_CATALOG_SEED_VERSION = 17;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;
