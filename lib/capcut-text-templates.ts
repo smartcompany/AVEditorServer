@@ -113,6 +113,8 @@ export const CAPCUT_TEXT_TEMPLATES: TextTemplatePackItem[] = [
     composition: {
       align: "start",
       gapFactor: 0.28,
+      // Enter adds another bubble; styles cycle blue / grey / blue / …
+      repeatSlots: true,
       slots: [
         {
           id: "m1",

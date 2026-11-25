@@ -6,9 +6,12 @@ export type {
   TextComposition,
 } from "./text-composition";
 export {
+  compositionEntriesFor,
+  compositionPaintedSlotCount,
   compositionSampleText,
   splitTextToSlots,
 } from "./text-composition";
+export type { TextCompEntry } from "./text-composition";
 import type { TextComposition } from "./text-composition";
 import { compositionSampleText } from "./text-composition";
 import { CAPCUT_TEXT_TEMPLATES } from "./capcut-text-templates";
@@ -690,7 +693,7 @@ for (const category of PACK_CATEGORIES) {
 }
 
 /** Seed (code) catalog version. Bump when the seed itself changes. */
-export const TEXT_CATALOG_SEED_VERSION = 15;
+export const TEXT_CATALOG_SEED_VERSION = 16;
 
 function withDefaultSampleText(item: TextTemplatePackItem): TextTemplatePackItem {
   if (item.sampleText?.trim()) return item;

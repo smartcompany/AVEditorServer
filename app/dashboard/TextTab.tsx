@@ -22,6 +22,8 @@ import {
   POP_ANIMATION_DEFAULTS,
   STAGED_ANIMATION_DEFAULTS,
   TYPEWRITER_ANIMATION_DEFAULTS,
+  compositionEntriesFor,
+  compositionPaintedSlotCount,
   compositionSampleText,
   type TextEntranceAnimationId,
 } from "@/lib/catalog";
@@ -1580,13 +1582,16 @@ function CompositionPreview({
   const fontPx = 28;
   const gap = fontPx * (composition.gapFactor ?? 0.16);
   const align = composition.align ?? "center";
+  const body =
+    item.sampleText?.trim() || compositionSampleText(composition);
+  const entries = compositionEntriesFor(composition, body);
   const frame = entranceFrame(
     item.animation?.id,
-    Array.from(compositionSampleText(composition)),
+    Array.from(body),
     progress,
     fontPx,
     item.animation,
-    composition.slots.length,
+    compositionPaintedSlotCount(composition, body),
   );
 
   const leftBar = composition.decorations?.find((d) => d.kind === "bar_v" && d.attach === "left");
@@ -1638,7 +1643,7 @@ function CompositionPreview({
               }}
             />
           )}
-          {composition.slots.map((slot, si) => {
+          {entries.map(({ slot, text: slotText }, si) => {
             const fs = fontPx * (slot.fontSizeFactor ?? 1);
             const below = composition.decorations?.find(
               (d) =>
@@ -1651,7 +1656,7 @@ function CompositionPreview({
             const slotDy = frame.slotDy?.[si] ?? 0;
             return (
               <div
-                key={slot.id}
+                key={`${slot.id}-${si}`}
                 style={{
                   marginLeft: (slot.dxFactor ?? 0) * fontPx,
                   textAlign: slot.align ?? align,
@@ -1678,7 +1683,7 @@ function CompositionPreview({
                     background: slot.boxFillColor != null ? argbHex(slot.boxFillColor) : undefined,
                   }}
                 >
-                  {slot.defaultText}
+                  {slotText || slot.defaultText}
                 </span>
                 {below && (
                   <div
