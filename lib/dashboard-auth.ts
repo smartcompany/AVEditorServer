@@ -87,6 +87,12 @@ export function isDashboardEmailAllowed(
   return email.trim().toLowerCase() === DASHBOARD_ALLOWED_EMAIL;
 }
 
+export function secretMatches(candidate: string | null | undefined): boolean {
+  const secret = configuredSecret();
+  if (!secret || !candidate) return false;
+  return candidate.trim() === secret;
+}
+
 /**
  * Verify a Google Identity Services ID token and return the email when
  * allowlisted + verified.
@@ -144,7 +150,8 @@ export function dashboardSessionCookieOptions(secure: boolean) {
   return {
     httpOnly: true,
     secure,
-    sameSite: "strict" as const,
+    // Lax so Google redirect callback can set the session cookie.
+    sameSite: "lax" as const,
     path: "/",
     maxAge: 60 * 60 * 12,
   };
