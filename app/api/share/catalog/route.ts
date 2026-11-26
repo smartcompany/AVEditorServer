@@ -18,16 +18,16 @@ const catalog = {
       },
     },
     {
+      kind: "tiktok",
+      label: { ko: "TikTok", en: "TikTok", ja: "TikTok", zh: "TikTok" },
+    },
+    {
       kind: "instagram",
       label: { ko: "Instagram", en: "Instagram", ja: "Instagram", zh: "Instagram" },
     },
     {
       kind: "facebook",
       label: { ko: "Facebook", en: "Facebook", ja: "Facebook", zh: "Facebook" },
-    },
-    {
-      kind: "tiktok",
-      label: { ko: "TikTok", en: "TikTok", ja: "TikTok", zh: "TikTok" },
     },
   ],
 };
