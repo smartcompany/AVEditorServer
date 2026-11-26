@@ -74,11 +74,8 @@ export async function GET(request: Request) {
 }
 
 /**
- * Create + optionally send a catalog push campaign.
- * Body: {
- *   titles: LocaleMap, bodies: LocaleMap,
- *   sendAt?: ISO string (schedule), sendNow?: boolean (default true if no sendAt)
- * }
+ * Create and immediately send a catalog push campaign.
+ * Body: { titles: LocaleMap, bodies: LocaleMap }
  */
 export async function POST(request: Request) {
   if (!(await authorizeDashboard(request))) {
@@ -123,21 +120,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const sendAtRaw = typeof raw.sendAt === "string" ? raw.sendAt.trim() : "";
-  const sendAt = sendAtRaw ? new Date(sendAtRaw) : null;
-  if (sendAtRaw && Number.isNaN(sendAt?.getTime())) {
-    return Response.json(
-      { error: "invalid_sendAt" },
-      { status: 400, headers: catalogCorsHeaders() },
-    );
-  }
-
-  const sendNow =
-    typeof raw.sendNow === "boolean"
-      ? raw.sendNow
-      : !sendAt || sendAt.getTime() <= Date.now();
-
-  const status = sendNow ? "pending" : "scheduled";
   const now = new Date().toISOString();
 
   try {
@@ -148,8 +130,8 @@ export async function POST(request: Request) {
         target: "catalog",
         titles,
         bodies,
-        status,
-        send_at: sendAt ? sendAt.toISOString() : sendNow ? now : null,
+        status: "pending",
+        send_at: now,
         created_at: now,
         updated_at: now,
       })
@@ -158,27 +140,19 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     const campaign = normalizeCampaign(data as Record<string, unknown>);
-
-    if (sendNow) {
-      const result = await dispatchCampaign(campaign.id);
-      const { data: refreshed } = await db
-        .from("aveditor_push_campaigns")
-        .select("*")
-        .eq("id", campaign.id)
-        .maybeSingle();
-      return Response.json(
-        {
-          campaign: refreshed
-            ? normalizeCampaign(refreshed as Record<string, unknown>)
-            : campaign,
-          result,
-        },
-        { headers: { ...catalogCorsHeaders(), "Cache-Control": "no-store" } },
-      );
-    }
-
+    const result = await dispatchCampaign(campaign.id);
+    const { data: refreshed } = await db
+      .from("aveditor_push_campaigns")
+      .select("*")
+      .eq("id", campaign.id)
+      .maybeSingle();
     return Response.json(
-      { campaign },
+      {
+        campaign: refreshed
+          ? normalizeCampaign(refreshed as Record<string, unknown>)
+          : campaign,
+        result,
+      },
       { headers: { ...catalogCorsHeaders(), "Cache-Control": "no-store" } },
     );
   } catch (error) {

@@ -34,7 +34,7 @@ create table if not exists public.aveditor_push_campaigns (
                check (target in ('catalog')),
   titles       jsonb not null default '{}'::jsonb,
   bodies       jsonb not null default '{}'::jsonb,
-  -- pending | scheduled | sending | sent | failed | cancelled
+  -- pending | sending | sent | failed
   status       text not null default 'pending',
   send_at      timestamptz,
   sent_at      timestamptz,
@@ -44,10 +44,6 @@ create table if not exists public.aveditor_push_campaigns (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
-
-create index if not exists aveditor_push_campaigns_due_idx
-  on public.aveditor_push_campaigns (status, send_at)
-  where status = 'scheduled';
 
 alter table public.aveditor_push_tokens enable row level security;
 alter table public.aveditor_push_campaigns enable row level security;

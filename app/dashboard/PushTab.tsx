@@ -38,8 +38,6 @@ export default function PushTab() {
   const [titles, setTitles] = useState<LocaleMap>(emptyLocale);
   const [bodies, setBodies] = useState<LocaleMap>(emptyLocale);
   const [locale, setLocale] = useState<Locale>("ko");
-  const [scheduleMode, setScheduleMode] = useState(false);
-  const [sendAtLocal, setSendAtLocal] = useState("");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -121,52 +119,27 @@ export default function PushTab() {
     }
   };
 
-  const submit = async (sendNow: boolean) => {
+  const submit = async () => {
     if (busy) return;
     setBusy(true);
     setStatus(null);
     try {
-      const payload: Record<string, unknown> = {
-        titles,
-        bodies,
-        sendNow,
-      };
-      if (!sendNow) {
-        if (!sendAtLocal) {
-          setStatus("예약 시간을 선택해 주세요.");
-          return;
-        }
-        const when = new Date(sendAtLocal);
-        if (Number.isNaN(when.getTime())) {
-          setStatus("예약 시간이 올바르지 않습니다.");
-          return;
-        }
-        payload.sendAt = when.toISOString();
-        payload.sendNow = false;
-      }
-
       const res = await fetch("/api/push/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ titles, bodies }),
       });
       const json = await res.json();
       if (!res.ok) {
         setStatus(`실패: ${json.message || json.error || res.status}`);
         return;
       }
-      if (sendNow) {
-        const result = json.result as
-          | { success?: number; failure?: number }
-          | undefined;
-        setStatus(
-          `전송 완료 · 성공 ${result?.success ?? 0} / 실패 ${result?.failure ?? 0}`,
-        );
-      } else {
-        setStatus(
-          `예약됨 · ${toLocalInputValue(json.campaign?.send_at ?? null) || sendAtLocal}`,
-        );
-      }
+      const result = json.result as
+        | { success?: number; failure?: number }
+        | undefined;
+      setStatus(
+        `전송 완료 · 성공 ${result?.success ?? 0} / 실패 ${result?.failure ?? 0}`,
+      );
       await loadCampaigns();
     } catch (e) {
       setStatus(`실패: ${e}`);
@@ -182,7 +155,7 @@ export default function PushTab() {
           <h2 style={ui.h1}>원격 푸시</h2>
           <p style={ui.sub}>
             새 콘텐츠(전환·텍스트 등) 알림. 앱에서 「새 콘텐츠」를 켠 사용자에게만
-            전송됩니다. 한글 작성 후 로컬라이징 → 보내기/예약.
+            전송됩니다. 한글 작성 후 로컬라이징 → 지금 보내기.
           </p>
         </div>
         <div style={ui.actions}>
@@ -235,45 +208,15 @@ export default function PushTab() {
         placeholder="예: 지금 EasyClip에서 새 스타일을 확인해 보세요."
       />
 
-      <div style={styles.scheduleRow}>
-        <label style={styles.checkLabel}>
-          <input
-            type="checkbox"
-            checked={scheduleMode}
-            onChange={(e) => setScheduleMode(e.target.checked)}
-          />
-          예약 전송
-        </label>
-        {scheduleMode && (
-          <input
-            type="datetime-local"
-            style={ui.input}
-            value={sendAtLocal}
-            onChange={(e) => setSendAtLocal(e.target.value)}
-          />
-        )}
-      </div>
-
       <div style={{ ...ui.actions, marginTop: 12 }}>
-        {!scheduleMode ? (
-          <button
-            type="button"
-            style={ui.btnPrimary}
-            disabled={busy}
-            onClick={() => void submit(true)}
-          >
-            {busy ? "전송 중…" : "지금 보내기"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            style={ui.btnPrimary}
-            disabled={busy}
-            onClick={() => void submit(false)}
-          >
-            {busy ? "예약 중…" : "예약하기"}
-          </button>
-        )}
+        <button
+          type="button"
+          style={ui.btnPrimary}
+          disabled={busy}
+          onClick={() => void submit()}
+        >
+          {busy ? "전송 중…" : "지금 보내기"}
+        </button>
         <button
           type="button"
           style={ui.btnGhost}
@@ -281,8 +224,6 @@ export default function PushTab() {
           onClick={() => {
             setTitles(emptyLocale());
             setBodies(emptyLocale());
-            setSendAtLocal("");
-            setScheduleMode(false);
             setStatus(null);
           }}
         >
@@ -302,7 +243,7 @@ export default function PushTab() {
               <tr>
                 <th style={styles.th}>상태</th>
                 <th style={styles.th}>제목(KO)</th>
-                <th style={styles.th}>예약/전송</th>
+                <th style={styles.th}>전송</th>
                 <th style={styles.th}>성공/실패</th>
               </tr>
             </thead>
@@ -318,10 +259,8 @@ export default function PushTab() {
                   </td>
                   <td style={styles.td}>
                     {c.sent_at
-                      ? `sent ${toLocalInputValue(c.sent_at)}`
-                      : c.send_at
-                        ? `at ${toLocalInputValue(c.send_at)}`
-                        : "—"}
+                      ? toLocalInputValue(c.sent_at)
+                      : "—"}
                   </td>
                   <td style={styles.td}>
                     {c.success_count}/{c.failure_count}
@@ -357,20 +296,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 12,
     color: "#8b93a7",
     margin: "10px 0 6px",
-  },
-  scheduleRow: {
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginTop: 14,
-  },
-  checkLabel: {
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    color: "#f4f6fb",
-    fontSize: 14,
   },
   tableWrap: {
     overflow: "auto",

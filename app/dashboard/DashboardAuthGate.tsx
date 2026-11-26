@@ -1,0 +1,269 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+
+type SessionState = {
+  authenticated: boolean;
+  email: string | null;
+  allowedEmail: string;
+  googleClientConfigured: boolean;
+};
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (cfg: {
+            client_id: string;
+            callback: (res: { credential: string }) => void;
+            auto_select?: boolean;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: Record<string, unknown>,
+          ) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
+
+type Props = {
+  children: ReactNode;
+  googleClientId: string | null;
+};
+
+export default function DashboardAuthGate({
+  children,
+  googleClientId,
+}: Props) {
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  const refresh = useCallback(async () => {
+    const res = await fetch("/api/dashboard/session", { cache: "no-store" });
+    const json = (await res.json()) as SessionState;
+    setSession(json);
+    return json;
+  }, []);
+
+  useEffect(() => {
+    void refresh().catch(() =>
+      setSession({
+        authenticated: false,
+        email: null,
+        allowedEmail: "gunnylove@gmail.com",
+        googleClientConfigured: Boolean(googleClientId),
+      }),
+    );
+  }, [refresh, googleClientId]);
+
+  const onCredential = useCallback(
+    async (credential: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/dashboard/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken: credential }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          if (json.error === "email_not_allowed") {
+            setError(
+              `허용된 계정만 접근할 수 있습니다 (${session?.allowedEmail ?? "gunnylove@gmail.com"}).`,
+            );
+          } else {
+            setError(`로그인 실패: ${json.error || res.status}`);
+          }
+          return;
+        }
+        await refresh();
+      } catch (e) {
+        setError(`로그인 실패: ${e}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh, session?.allowedEmail],
+  );
+
+  useEffect(() => {
+    if (!session || session.authenticated) return;
+    if (!googleClientId || !buttonRef.current) return;
+
+    let cancelled = false;
+
+    const mount = () => {
+      if (cancelled || !window.google || !buttonRef.current) return;
+      buttonRef.current.innerHTML = "";
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (res) => {
+          void onCredential(res.credential);
+        },
+      });
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: "outline",
+        size: "large",
+        shape: "pill",
+        text: "signin_with",
+        width: 280,
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      mount();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-google-gsi="1"]',
+    );
+    if (existing) {
+      existing.addEventListener("load", mount);
+      return () => {
+        cancelled = true;
+        existing.removeEventListener("load", mount);
+      };
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.dataset.googleGsi = "1";
+    script.addEventListener("load", mount);
+    document.head.appendChild(script);
+    return () => {
+      cancelled = true;
+      script.removeEventListener("load", mount);
+    };
+  }, [session, googleClientId, onCredential]);
+
+  const logout = async () => {
+    setBusy(true);
+    try {
+      await fetch("/api/dashboard/session", { method: "DELETE" });
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!session) {
+    return (
+      <div style={styles.center}>
+        <p style={styles.muted}>확인 중…</p>
+      </div>
+    );
+  }
+
+  if (!session.authenticated) {
+    return (
+      <div style={styles.center}>
+        <div style={styles.card}>
+          <p style={styles.eyebrow}>ClipGo · Dashboard</p>
+          <h1 style={styles.h1}>관리자 로그인</h1>
+          <p style={styles.body}>
+            Google 계정 <strong>{session.allowedEmail}</strong> 으로만 접근할 수
+            있습니다.
+          </p>
+          {!googleClientId ? (
+            <p style={styles.warn}>
+              `GOOGLE_CLIENT_ID` (Web OAuth 클라이언트 ID) 환경 변수가
+              필요합니다.
+            </p>
+          ) : (
+            <div ref={buttonRef} style={styles.btnWrap} />
+          )}
+          {busy && <p style={styles.muted}>로그인 중…</p>}
+          {error && <p style={styles.err}>{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={styles.topBar}>
+        <span style={styles.muted}>{session.email}</span>
+        <button
+          type="button"
+          style={styles.logout}
+          disabled={busy}
+          onClick={() => void logout()}
+        >
+          로그아웃
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const styles: Record<string, CSSProperties> = {
+  center: {
+    minHeight: "70vh",
+    display: "grid",
+    placeItems: "center",
+    padding: 24,
+  },
+  card: {
+    width: "min(420px, 100%)",
+    background: "#151923",
+    border: "1px solid #2a3142",
+    borderRadius: 16,
+    padding: 28,
+  },
+  eyebrow: {
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "#8b93a7",
+    fontSize: 12,
+    margin: 0,
+  },
+  h1: { fontSize: 24, margin: "8px 0 10px", color: "#f4f6fb" },
+  body: { color: "#b7bfcf", fontSize: 14, lineHeight: 1.5, margin: "0 0 20px" },
+  btnWrap: { display: "flex", justifyContent: "center", minHeight: 44 },
+  muted: { color: "#8b93a7", fontSize: 13 },
+  warn: {
+    color: "#ffb86b",
+    fontSize: 13,
+    background: "#2a2118",
+    borderRadius: 8,
+    padding: "10px 12px",
+  },
+  err: { color: "#ff8a8a", fontSize: 13, marginTop: 12 },
+  topBar: {
+    maxWidth: 1240,
+    margin: "0 auto",
+    padding: "12px 20px 0",
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 12,
+  },
+  logout: {
+    background: "transparent",
+    border: "1px solid #2a3142",
+    color: "#f4f6fb",
+    borderRadius: 8,
+    padding: "6px 12px",
+    cursor: "pointer",
+    fontSize: 13,
+  },
+};

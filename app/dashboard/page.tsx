@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
+import { googleOAuthClientId } from "@/lib/dashboard-auth";
 import { getBackgroundCatalog } from "@/lib/background-catalog-store";
 import { getPlansConfig } from "@/lib/plans-config-store";
 import { getTextPackCatalog } from "@/lib/text-catalog-store";
 import { getTransitionCatalog } from "@/lib/transition-catalog-store";
+import DashboardAuthGate from "./DashboardAuthGate";
 import DashboardClient from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +21,13 @@ export default async function DashboardPage() {
     getPlansConfig(),
   ]);
   return (
-    <DashboardClient
-      initialTransitions={transitions}
-      initialText={text}
-      initialBackgrounds={backgrounds}
-      initialPlans={plans}
-    />
+    <DashboardAuthGate googleClientId={googleOAuthClientId()}>
+      <DashboardClient
+        initialTransitions={transitions}
+        initialText={text}
+        initialBackgrounds={backgrounds}
+        initialPlans={plans}
+      />
+    </DashboardAuthGate>
   );
 }
