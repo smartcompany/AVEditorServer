@@ -1,9 +1,8 @@
 export const runtime = "edge";
 
 /**
- * Share destinations after export. Array order is priority:
- * the first entry is the large button, the rest are icon buttons.
- * `more` is not listed — the app always appends the system share action.
+ * Share destinations after export. Array order is the 2×2 grid order
+ * (row-major). The client shows nothing when this catalog is empty/unavailable.
  */
 const catalog = {
   version: 0,
