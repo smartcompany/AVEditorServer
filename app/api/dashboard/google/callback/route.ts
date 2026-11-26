@@ -25,60 +25,76 @@ function dashboardOrigin(request: Request): string {
   return url.origin;
 }
 
+function redirect(
+  location: string,
+  cookieValue?: string,
+  secure = true,
+): Response {
+  const headers = new Headers({ Location: location });
+  if (cookieValue) {
+    const opts = dashboardSessionCookieOptions(secure);
+    headers.set(
+      "Set-Cookie",
+      `${DASHBOARD_COOKIE}=${encodeURIComponent(cookieValue)}; Path=${opts.path}; Max-Age=${opts.maxAge}; HttpOnly; SameSite=Lax${opts.secure ? "; Secure" : ""}`,
+    );
+  }
+  // Response.redirect() headers are immutable — build a fresh Response.
+  return new Response(null, { status: 303, headers });
+}
+
 /**
  * Google Identity Services redirect UX posts here with `credential`.
  * Also accepts JSON `{ idToken }` for debugging.
  */
 export async function POST(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  let idToken = "";
+  try {
+    const contentType = request.headers.get("content-type") ?? "";
+    let idToken = "";
 
-  if (contentType.includes("application/x-www-form-urlencoded")) {
-    const form = await request.formData();
-    const credential = form.get("credential");
-    if (typeof credential === "string") idToken = credential.trim();
-  } else {
-    try {
-      const body = await request.json();
-      if (body && typeof body.idToken === "string") {
-        idToken = body.idToken.trim();
-      } else if (body && typeof body.credential === "string") {
-        idToken = body.credential.trim();
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const form = await request.formData();
+      const credential = form.get("credential");
+      if (typeof credential === "string") idToken = credential.trim();
+    } else {
+      try {
+        const body = await request.json();
+        if (body && typeof body.idToken === "string") {
+          idToken = body.idToken.trim();
+        } else if (body && typeof body.credential === "string") {
+          idToken = body.credential.trim();
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
     }
-  }
 
-  const origin = dashboardOrigin(request);
-  if (!idToken) {
-    return Response.redirect(
-      `${origin}/dashboard?login_error=missing_credential`,
-      303,
+    const origin = dashboardOrigin(request);
+    if (!idToken) {
+      return redirect(`${origin}/dashboard?login_error=missing_credential`);
+    }
+
+    const verified = await verifyGoogleDashboardIdToken(idToken);
+    if ("error" in verified) {
+      return redirect(
+        `${origin}/dashboard?login_error=${encodeURIComponent(verified.error)}`,
+      );
+    }
+
+    const cookie = await createDashboardSessionCookie(verified.email);
+    if (!cookie) {
+      return redirect(
+        `${origin}/dashboard?login_error=session_secret_missing`,
+      );
+    }
+
+    return redirect(
+      `${origin}/dashboard`,
+      cookie,
+      isSecure(request),
     );
+  } catch (err) {
+    console.error("[dashboard/google/callback]", err);
+    const origin = dashboardOrigin(request);
+    return redirect(`${origin}/dashboard?login_error=callback_failed`);
   }
-
-  const verified = await verifyGoogleDashboardIdToken(idToken);
-  if ("error" in verified) {
-    return Response.redirect(
-      `${origin}/dashboard?login_error=${encodeURIComponent(verified.error)}`,
-      303,
-    );
-  }
-
-  const cookie = await createDashboardSessionCookie(verified.email);
-  if (!cookie) {
-    return Response.redirect(
-      `${origin}/dashboard?login_error=session_secret_missing`,
-      303,
-    );
-  }
-
-  const response = Response.redirect(`${origin}/dashboard`, 303);
-  const opts = dashboardSessionCookieOptions(isSecure(request));
-  response.headers.append(
-    "Set-Cookie",
-    `${DASHBOARD_COOKIE}=${encodeURIComponent(cookie)}; Path=${opts.path}; Max-Age=${opts.maxAge}; HttpOnly; SameSite=Lax${opts.secure ? "; Secure" : ""}`,
-  );
-  return response;
 }

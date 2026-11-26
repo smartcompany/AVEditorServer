@@ -45,6 +45,7 @@ const LOGIN_ERROR_LABELS: Record<string, string> = {
   invalid_id_token: "Google 토큰 검증 실패. 클라이언트 ID / 리디렉션 URI를 확인하세요.",
   google_client_id_missing: "GOOGLE_CLIENT_ID가 서버에 없습니다.",
   session_secret_missing: "DASHBOARD_SECRET이 서버에 없습니다.",
+  callback_failed: "Google 로그인 처리 중 서버 오류가 났습니다. 다시 시도해 주세요.",
 };
 
 export default function DashboardAuthGate({
