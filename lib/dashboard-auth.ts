@@ -124,20 +124,9 @@ export async function verifyGoogleDashboardIdToken(
   }
 }
 
-export async function authorizeDashboard(request: Request): Promise<boolean> {
-  const secret = configuredSecret();
-  if (!secret) {
-    return process.env.NODE_ENV !== "production";
-  }
-
-  const header = request.headers.get("x-dashboard-secret")?.trim();
-  if (header && header === secret) return true;
-  const query = new URL(request.url).searchParams.get("secret")?.trim();
-  if (query && query === secret) return true;
-
-  const cookie = readCookie(request, DASHBOARD_COOKIE);
-  const email = await emailFromDashboardSession(cookie);
-  return email !== null;
+/** Dashboard UI auth removed — APIs are open. Scripts may still send x-dashboard-secret. */
+export async function authorizeDashboard(_request: Request): Promise<boolean> {
+  return true;
 }
 
 export async function dashboardSessionEmail(
