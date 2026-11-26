@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -15,6 +14,10 @@ type SessionState = {
   email: string | null;
   allowedEmail: string;
   googleClientConfigured: boolean;
+};
+
+type GoogleCredentialResponse = {
+  credential?: string;
 };
 
 declare global {
@@ -42,7 +45,7 @@ const LOGIN_ERROR_LABELS: Record<string, string> = {
   missing_credential: "Google 로그인 결과가 없습니다. 다시 시도해 주세요.",
   email_not_allowed: "허용된 Google 계정이 아닙니다.",
   email_unverified: "이메일 인증이 안 된 Google 계정입니다.",
-  invalid_id_token: "Google 토큰 검증 실패. 클라이언트 ID / 리디렉션 URI를 확인하세요.",
+  invalid_id_token: "Google 토큰 검증 실패. 클라이언트 ID를 확인하세요.",
   google_client_id_missing: "GOOGLE_CLIENT_ID가 서버에 없습니다.",
   session_secret_missing: "DASHBOARD_SECRET이 서버에 없습니다.",
   callback_failed: "Google 로그인 처리 중 서버 오류가 났습니다. 다시 시도해 주세요.",
@@ -58,11 +61,6 @@ export default function DashboardAuthGate({
   const buttonRef = useRef<HTMLDivElement>(null);
   const gsiReadyRef = useRef(false);
 
-  const loginUri = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    return `${window.location.origin}/api/dashboard/google/callback`;
-  }, []);
-
   const refresh = useCallback(async () => {
     const res = await fetch("/api/dashboard/session", {
       cache: "no-store",
@@ -73,10 +71,42 @@ export default function DashboardAuthGate({
     return json;
   }, []);
 
+  const loginWithCredential = useCallback(
+    async (credential: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/dashboard/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ idToken: credential }),
+        });
+        const json = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          setError(
+            LOGIN_ERROR_LABELS[json.error ?? ""] ??
+              `로그인 실패: ${json.error || res.status}`,
+          );
+          return;
+        }
+        await refresh();
+      } catch (err) {
+        setError(`로그인 실패: ${err}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
+
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("login_error");
     if (code) {
       setError(LOGIN_ERROR_LABELS[code] ?? `로그인 실패: ${code}`);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("login_error");
+      window.history.replaceState({}, "", url.pathname + url.search);
     }
   }, []);
 
@@ -93,7 +123,7 @@ export default function DashboardAuthGate({
 
   useEffect(() => {
     if (!session || session.authenticated) return;
-    if (!googleClientId || !buttonRef.current || !loginUri) return;
+    if (!googleClientId || !buttonRef.current) return;
     if (gsiReadyRef.current) return;
 
     let cancelled = false;
@@ -103,11 +133,18 @@ export default function DashboardAuthGate({
       if (gsiReadyRef.current) return;
       gsiReadyRef.current = true;
       buttonRef.current.innerHTML = "";
-      // Redirect UX avoids popup/COOP issues — Google POSTs credential to login_uri.
+      // Popup + JS callback: only needs Authorized JavaScript origins (no redirect URI).
       window.google.accounts.id.initialize({
         client_id: googleClientId,
-        ux_mode: "redirect",
-        login_uri: loginUri,
+        callback: (response: GoogleCredentialResponse) => {
+          const credential = response.credential?.trim();
+          if (!credential) {
+            setError(LOGIN_ERROR_LABELS.missing_credential);
+            return;
+          }
+          void loginWithCredential(credential);
+        },
+        ux_mode: "popup",
         use_fedcm_for_prompt: false,
       });
       window.google.accounts.id.renderButton(buttonRef.current, {
@@ -150,7 +187,7 @@ export default function DashboardAuthGate({
     return () => {
       cancelled = true;
     };
-  }, [session, googleClientId, loginUri]);
+  }, [session, googleClientId, loginWithCredential]);
 
   const logout = async () => {
     setBusy(true);
@@ -191,6 +228,7 @@ export default function DashboardAuthGate({
           ) : (
             <div ref={buttonRef} style={styles.btnWrap} />
           )}
+          {busy && <p style={styles.muted}>로그인 중…</p>}
           {error && <p style={styles.err}>{error}</p>}
         </div>
       </div>
