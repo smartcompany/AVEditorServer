@@ -24,5 +24,11 @@
       "source": "/api/backgrounds/catalog.json",
       "destination": "/api/backgrounds/catalog"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/push/cron",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }
