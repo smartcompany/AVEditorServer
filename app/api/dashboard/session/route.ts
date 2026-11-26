@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import {
   createDashboardSessionCookie,
   DASHBOARD_ALLOWED_EMAIL,
@@ -18,25 +19,46 @@ function isSecure(request: Request): boolean {
   return (proto ?? url.protocol.replace(":", "")) === "https";
 }
 
-function setSessionCookie(response: Response, value: string, secure: boolean) {
+function withSessionCookie(
+  data: unknown,
+  cookieValue: string | null,
+  secure: boolean,
+  status = 200,
+) {
+  const res = NextResponse.json(data, { status });
   const opts = dashboardSessionCookieOptions(secure);
-  response.headers.append(
-    "Set-Cookie",
-    `${DASHBOARD_COOKIE}=${encodeURIComponent(value)}; Path=${opts.path}; Max-Age=${opts.maxAge}; HttpOnly; SameSite=Lax${opts.secure ? "; Secure" : ""}`,
-  );
+  if (cookieValue) {
+    res.cookies.set({
+      name: DASHBOARD_COOKIE,
+      value: cookieValue,
+      httpOnly: opts.httpOnly,
+      secure: opts.secure,
+      sameSite: opts.sameSite,
+      path: opts.path,
+      maxAge: opts.maxAge,
+    });
+  }
+  return res;
 }
 
-function clearSessionCookie(response: Response, secure: boolean) {
-  response.headers.append(
-    "Set-Cookie",
-    `${DASHBOARD_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`,
-  );
+function clearSession(secure: boolean) {
+  const res = NextResponse.json({ authenticated: false });
+  res.cookies.set({
+    name: DASHBOARD_COOKIE,
+    value: "",
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return res;
 }
 
 /** Who is signed in (if anyone). */
 export async function GET(request: Request) {
   const email = await dashboardSessionEmail(request);
-  return Response.json({
+  return NextResponse.json({
     authenticated: email !== null,
     email,
     allowedEmail: DASHBOARD_ALLOWED_EMAIL,
@@ -46,37 +68,38 @@ export async function GET(request: Request) {
 
 /**
  * Body:
- * - { idToken } Google credential (popup / client callback)
- * - { secret } DASHBOARD_SECRET password fallback
+ * - { idToken } Google credential
+ * - { secret } DASHBOARD_SECRET (scripts / emergency)
  */
 export async function POST(request: Request) {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "invalid_json" }, { status: 400 });
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
   if (!body || typeof body !== "object") {
-    return Response.json({ error: "invalid_body" }, { status: 400 });
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
   const raw = body as Record<string, unknown>;
+  const secure = isSecure(request);
 
-  // Password fallback — same env secret used to sign the session cookie.
   if (typeof raw.secret === "string" && raw.secret.trim()) {
     if (!secretMatches(raw.secret)) {
-      return Response.json({ error: "invalid_secret" }, { status: 401 });
+      return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
     }
-    // Session cookie still encodes the allowlisted admin email.
     const cookie = await createDashboardSessionCookie(DASHBOARD_ALLOWED_EMAIL);
     if (!cookie) {
-      return Response.json({ error: "session_secret_missing" }, { status: 503 });
+      return NextResponse.json(
+        { error: "session_secret_missing" },
+        { status: 503 },
+      );
     }
-    const response = Response.json({
-      authenticated: true,
-      email: DASHBOARD_ALLOWED_EMAIL,
-    });
-    setSessionCookie(response, cookie, isSecure(request));
-    return response;
+    return withSessionCookie(
+      { authenticated: true, email: DASHBOARD_ALLOWED_EMAIL },
+      cookie,
+      secure,
+    );
   }
 
   const idToken =
@@ -86,7 +109,7 @@ export async function POST(request: Request) {
         ? raw.credential.trim()
         : "";
   if (!idToken) {
-    return Response.json({ error: "idToken_required" }, { status: 400 });
+    return NextResponse.json({ error: "idToken_required" }, { status: 400 });
   }
 
   const verified = await verifyGoogleDashboardIdToken(idToken);
@@ -97,25 +120,25 @@ export async function POST(request: Request) {
         : verified.error === "google_client_id_missing"
           ? 503
           : 401;
-    return Response.json({ error: verified.error }, { status });
+    return NextResponse.json({ error: verified.error }, { status });
   }
 
   const cookie = await createDashboardSessionCookie(verified.email);
   if (!cookie) {
-    return Response.json({ error: "session_secret_missing" }, { status: 503 });
+    return NextResponse.json(
+      { error: "session_secret_missing" },
+      { status: 503 },
+    );
   }
 
-  const response = Response.json({
-    authenticated: true,
-    email: verified.email,
-  });
-  setSessionCookie(response, cookie, isSecure(request));
-  return response;
+  return withSessionCookie(
+    { authenticated: true, email: verified.email },
+    cookie,
+    secure,
+  );
 }
 
 /** Sign out. */
 export async function DELETE(request: Request) {
-  const response = Response.json({ authenticated: false });
-  clearSessionCookie(response, isSecure(request));
-  return response;
+  return clearSession(isSecure(request));
 }

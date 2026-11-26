@@ -3,7 +3,7 @@
 import {
   useCallback,
   useEffect,
-  useRef,
+  useMemo,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -15,26 +15,6 @@ type SessionState = {
   allowedEmail: string;
   googleClientConfigured: boolean;
 };
-
-type GoogleCredentialResponse = {
-  credential?: string;
-};
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (cfg: Record<string, unknown>) => void;
-          renderButton: (
-            parent: HTMLElement,
-            options: Record<string, unknown>,
-          ) => void;
-        };
-      };
-    };
-  }
-}
 
 type Props = {
   children: ReactNode;
@@ -51,6 +31,12 @@ const LOGIN_ERROR_LABELS: Record<string, string> = {
   callback_failed: "Google 로그인 처리 중 서버 오류가 났습니다. 다시 시도해 주세요.",
 };
 
+function randomNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default function DashboardAuthGate({
   children,
   googleClientId,
@@ -58,8 +44,11 @@ export default function DashboardAuthGate({
   const [session, setSession] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const buttonRef = useRef<HTMLDivElement>(null);
-  const gsiReadyRef = useRef(false);
+
+  const redirectUri = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/api/dashboard/google/callback`;
+  }, []);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/dashboard/session", {
@@ -70,35 +59,6 @@ export default function DashboardAuthGate({
     setSession(json);
     return json;
   }, []);
-
-  const loginWithCredential = useCallback(
-    async (credential: string) => {
-      setBusy(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/dashboard/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ idToken: credential }),
-        });
-        const json = (await res.json()) as { error?: string };
-        if (!res.ok) {
-          setError(
-            LOGIN_ERROR_LABELS[json.error ?? ""] ??
-              `로그인 실패: ${json.error || res.status}`,
-          );
-          return;
-        }
-        await refresh();
-      } catch (err) {
-        setError(`로그인 실패: ${err}`);
-      } finally {
-        setBusy(false);
-      }
-    },
-    [refresh],
-  );
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("login_error");
@@ -121,73 +81,24 @@ export default function DashboardAuthGate({
     );
   }, [refresh, googleClientId]);
 
-  useEffect(() => {
-    if (!session || session.authenticated) return;
-    if (!googleClientId || !buttonRef.current) return;
-    if (gsiReadyRef.current) return;
-
-    let cancelled = false;
-
-    const mount = () => {
-      if (cancelled || !window.google || !buttonRef.current) return;
-      if (gsiReadyRef.current) return;
-      gsiReadyRef.current = true;
-      buttonRef.current.innerHTML = "";
-      // Popup + JS callback: only needs Authorized JavaScript origins (no redirect URI).
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: (response: GoogleCredentialResponse) => {
-          const credential = response.credential?.trim();
-          if (!credential) {
-            setError(LOGIN_ERROR_LABELS.missing_credential);
-            return;
-          }
-          void loginWithCredential(credential);
-        },
-        ux_mode: "popup",
-        use_fedcm_for_prompt: false,
-      });
-      window.google.accounts.id.renderButton(buttonRef.current, {
-        theme: "outline",
-        size: "large",
-        shape: "pill",
-        text: "signin_with",
-        width: 280,
-      });
-    };
-
-    if (window.google?.accounts?.id) {
-      mount();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-google-gsi="1"]',
-    );
-    if (existing) {
-      if (existing.dataset.loaded === "1") mount();
-      else existing.addEventListener("load", mount);
-      return () => {
-        cancelled = true;
-        existing.removeEventListener("load", mount);
-      };
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.dataset.googleGsi = "1";
-    script.addEventListener("load", () => {
-      script.dataset.loaded = "1";
-      mount();
+  const startGoogleLogin = () => {
+    if (!googleClientId || !redirectUri || busy) return;
+    setBusy(true);
+    setError(null);
+    const nonce = randomNonce();
+    const params = new URLSearchParams({
+      client_id: googleClientId,
+      redirect_uri: redirectUri,
+      response_type: "id_token",
+      response_mode: "form_post",
+      scope: "openid email profile",
+      nonce,
+      prompt: "select_account",
     });
-    document.head.appendChild(script);
-    return () => {
-      cancelled = true;
-    };
-  }, [session, googleClientId, loginWithCredential]);
+    window.location.assign(
+      `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+    );
+  };
 
   const logout = async () => {
     setBusy(true);
@@ -196,7 +107,6 @@ export default function DashboardAuthGate({
         method: "DELETE",
         credentials: "include",
       });
-      gsiReadyRef.current = false;
       await refresh();
     } finally {
       setBusy(false);
@@ -226,9 +136,15 @@ export default function DashboardAuthGate({
               `GOOGLE_CLIENT_ID` 환경 변수가 필요합니다.
             </p>
           ) : (
-            <div ref={buttonRef} style={styles.btnWrap} />
+            <button
+              type="button"
+              style={styles.googleBtn}
+              disabled={busy}
+              onClick={startGoogleLogin}
+            >
+              Google로 로그인
+            </button>
           )}
-          {busy && <p style={styles.muted}>로그인 중…</p>}
           {error && <p style={styles.err}>{error}</p>}
         </div>
       </div>
@@ -276,7 +192,17 @@ const styles: Record<string, CSSProperties> = {
   },
   h1: { fontSize: 24, margin: "8px 0 10px", color: "#f4f6fb" },
   body: { color: "#b7bfcf", fontSize: 14, lineHeight: 1.5, margin: "0 0 20px" },
-  btnWrap: { display: "flex", justifyContent: "center", minHeight: 44 },
+  googleBtn: {
+    width: "100%",
+    background: "#fff",
+    color: "#1f1f1f",
+    border: "none",
+    borderRadius: 999,
+    padding: "12px 16px",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+  },
   muted: { color: "#8b93a7", fontSize: 13 },
   warn: {
     color: "#ffb86b",

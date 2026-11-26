@@ -38,37 +38,46 @@ function redirect(
       `${DASHBOARD_COOKIE}=${encodeURIComponent(cookieValue)}; Path=${opts.path}; Max-Age=${opts.maxAge}; HttpOnly; SameSite=Lax${opts.secure ? "; Secure" : ""}`,
     );
   }
-  // Response.redirect() headers are immutable — build a fresh Response.
   return new Response(null, { status: 303, headers });
 }
 
-/**
- * Google Identity Services redirect UX posts here with `credential`.
- * Also accepts JSON `{ idToken }` for debugging.
- */
-export async function POST(request: Request) {
-  try {
-    const contentType = request.headers.get("content-type") ?? "";
-    let idToken = "";
+async function readIdToken(request: Request): Promise<string> {
+  const contentType = request.headers.get("content-type") ?? "";
 
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      const form = await request.formData();
-      const credential = form.get("credential");
-      if (typeof credential === "string") idToken = credential.trim();
-    } else {
-      try {
-        const body = await request.json();
-        if (body && typeof body.idToken === "string") {
-          idToken = body.idToken.trim();
-        } else if (body && typeof body.credential === "string") {
-          idToken = body.credential.trim();
-        }
-      } catch {
-        /* ignore */
+  if (
+    contentType.includes("application/x-www-form-urlencoded") ||
+    contentType.includes("multipart/form-data")
+  ) {
+    const form = await request.formData();
+    for (const key of ["credential", "id_token", "idToken"]) {
+      const value = form.get(key);
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "";
+  }
+
+  try {
+    const body = await request.json();
+    if (body && typeof body === "object") {
+      const raw = body as Record<string, unknown>;
+      for (const key of ["credential", "id_token", "idToken"]) {
+        const value = raw[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
       }
     }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
 
-    const origin = dashboardOrigin(request);
+/**
+ * Google OIDC form_post / GIS redirect posts the ID token here.
+ */
+export async function POST(request: Request) {
+  const origin = dashboardOrigin(request);
+  try {
+    const idToken = await readIdToken(request);
     if (!idToken) {
       return redirect(`${origin}/dashboard?login_error=missing_credential`);
     }
@@ -87,14 +96,15 @@ export async function POST(request: Request) {
       );
     }
 
-    return redirect(
-      `${origin}/dashboard`,
-      cookie,
-      isSecure(request),
-    );
+    return redirect(`${origin}/dashboard`, cookie, isSecure(request));
   } catch (err) {
     console.error("[dashboard/google/callback]", err);
-    const origin = dashboardOrigin(request);
     return redirect(`${origin}/dashboard?login_error=callback_failed`);
   }
+}
+
+/** Accidental GET — send back to login. */
+export async function GET(request: Request) {
+  const origin = dashboardOrigin(request);
+  return redirect(`${origin}/dashboard?login_error=missing_credential`);
 }
