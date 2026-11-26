@@ -37,6 +37,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Google Identity Services needs postMessage across the opener;
+        // `same-origin` (browser/Vercel default in some setups) blocks login.
+        source: "/dashboard",
+        headers: [
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
+          },
+        ],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },

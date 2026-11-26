@@ -21,16 +21,11 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (cfg: {
-            client_id: string;
-            callback: (res: { credential: string }) => void;
-            auto_select?: boolean;
-          }) => void;
+          initialize: (cfg: Record<string, unknown>) => void;
           renderButton: (
             parent: HTMLElement,
             options: Record<string, unknown>,
           ) => void;
-          prompt: () => void;
         };
       };
     };
@@ -50,6 +45,8 @@ export default function DashboardAuthGate({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
+  const gsiReadyRef = useRef(false);
+  const onCredentialRef = useRef<(credential: string) => void>(() => undefined);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/dashboard/session", { cache: "no-store" });
@@ -77,6 +74,7 @@ export default function DashboardAuthGate({
         const res = await fetch("/api/dashboard/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ idToken: credential }),
         });
         const json = await res.json();
@@ -84,6 +82,10 @@ export default function DashboardAuthGate({
           if (json.error === "email_not_allowed") {
             setError(
               `허용된 계정만 접근할 수 있습니다 (${session?.allowedEmail ?? "gunnylove@gmail.com"}).`,
+            );
+          } else if (json.error === "invalid_id_token") {
+            setError(
+              "Google 토큰 검증 실패. GOOGLE_CLIENT_ID와 OAuth 클라이언트의 JS 원본(localhost/배포 URL)을 확인하세요.",
             );
           } else {
             setError(`로그인 실패: ${json.error || res.status}`);
@@ -101,18 +103,29 @@ export default function DashboardAuthGate({
   );
 
   useEffect(() => {
+    onCredentialRef.current = (credential) => {
+      void onCredential(credential);
+    };
+  }, [onCredential]);
+
+  useEffect(() => {
     if (!session || session.authenticated) return;
     if (!googleClientId || !buttonRef.current) return;
+    if (gsiReadyRef.current) return;
 
     let cancelled = false;
 
     const mount = () => {
       if (cancelled || !window.google || !buttonRef.current) return;
+      if (gsiReadyRef.current) return;
+      gsiReadyRef.current = true;
       buttonRef.current.innerHTML = "";
       window.google.accounts.id.initialize({
         client_id: googleClientId,
-        callback: (res) => {
-          void onCredential(res.credential);
+        // Avoid FedCM/COOP friction in Chrome; use the classic button callback.
+        use_fedcm_for_prompt: false,
+        callback: (res: { credential: string }) => {
+          onCredentialRef.current(res.credential);
         },
       });
       window.google.accounts.id.renderButton(buttonRef.current, {
@@ -135,7 +148,11 @@ export default function DashboardAuthGate({
       'script[data-google-gsi="1"]',
     );
     if (existing) {
-      existing.addEventListener("load", mount);
+      if (existing.dataset.loaded === "1") {
+        mount();
+      } else {
+        existing.addEventListener("load", mount);
+      }
       return () => {
         cancelled = true;
         existing.removeEventListener("load", mount);
@@ -146,18 +163,24 @@ export default function DashboardAuthGate({
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.dataset.googleGsi = "1";
-    script.addEventListener("load", mount);
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "1";
+      mount();
+    });
     document.head.appendChild(script);
     return () => {
       cancelled = true;
-      script.removeEventListener("load", mount);
     };
-  }, [session, googleClientId, onCredential]);
+  }, [session, googleClientId]);
 
   const logout = async () => {
     setBusy(true);
     try {
-      await fetch("/api/dashboard/session", { method: "DELETE" });
+      await fetch("/api/dashboard/session", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      gsiReadyRef.current = false;
       await refresh();
     } finally {
       setBusy(false);
