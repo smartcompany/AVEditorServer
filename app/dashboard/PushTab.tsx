@@ -6,6 +6,15 @@ import { ui } from "./ui";
 type Locale = "en" | "ko" | "ja" | "zh";
 type LocaleMap = Record<Locale, string>;
 
+type DeliveryLogEntry = {
+  deviceKey: string;
+  platform: string;
+  locale: string;
+  tokenTail: string;
+  ok: boolean;
+  error: string | null;
+};
+
 type Campaign = {
   id: string;
   target: string;
@@ -16,6 +25,7 @@ type Campaign = {
   sent_at: string | null;
   success_count: number;
   failure_count: number;
+  delivery_log: DeliveryLogEntry[];
   error_message: string | null;
   created_at: string;
 };
@@ -34,11 +44,19 @@ function toLocalInputValue(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function shortId(value: string): string {
+  if (!value) return "—";
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 8)}…${value.slice(-6)}`;
+}
+
 export default function PushTab() {
   const [titles, setTitles] = useState<LocaleMap>(emptyLocale);
   const [bodies, setBodies] = useState<LocaleMap>(emptyLocale);
   const [locale, setLocale] = useState<Locale>("ko");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [liveLog, setLiveLog] = useState<DeliveryLogEntry[] | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [translating, setTranslating] = useState(false);
@@ -53,7 +71,15 @@ export default function PushTab() {
         setStatus(`목록 실패: ${json.message || json.error || res.status}`);
         return;
       }
-      setCampaigns((json.campaigns as Campaign[]) ?? []);
+      const rows = ((json.campaigns as Campaign[]) ?? []).map((c) => ({
+        ...c,
+        delivery_log: Array.isArray(c.delivery_log) ? c.delivery_log : [],
+      }));
+      setCampaigns(rows);
+      setSelectedId((prev) => {
+        if (prev && rows.some((c) => c.id === prev)) return prev;
+        return rows[0]?.id ?? null;
+      });
     } catch (e) {
       setStatus(`목록 실패: ${e}`);
     } finally {
@@ -64,6 +90,10 @@ export default function PushTab() {
   useEffect(() => {
     void loadCampaigns();
   }, [loadCampaigns]);
+
+  const selected =
+    campaigns.find((c) => c.id === selectedId) ?? campaigns[0] ?? null;
+  const logEntries = liveLog ?? selected?.delivery_log ?? [];
 
   const applyLocaleTranslation = async () => {
     const from = locale;
@@ -123,6 +153,7 @@ export default function PushTab() {
     if (busy) return;
     setBusy(true);
     setStatus(null);
+    setLiveLog(null);
     try {
       const res = await fetch("/api/push/campaigns", {
         method: "POST",
@@ -135,10 +166,22 @@ export default function PushTab() {
         return;
       }
       const result = json.result as
-        | { success?: number; failure?: number }
+        | {
+            success?: number;
+            failure?: number;
+            deliveryLog?: DeliveryLogEntry[];
+          }
         | undefined;
+      const campaign = json.campaign as Campaign | undefined;
+      const log = Array.isArray(result?.deliveryLog)
+        ? result!.deliveryLog!
+        : Array.isArray(campaign?.delivery_log)
+          ? campaign!.delivery_log
+          : [];
+      setLiveLog(log);
+      if (campaign?.id) setSelectedId(campaign.id);
       setStatus(
-        `전송 완료 · 성공 ${result?.success ?? 0} / 실패 ${result?.failure ?? 0}`,
+        `전송 완료 · 성공 ${result?.success ?? 0} / 실패 ${result?.failure ?? 0} · 대상 ${log.length}대`,
       );
       await loadCampaigns();
     } catch (e) {
@@ -225,10 +268,69 @@ export default function PushTab() {
             setTitles(emptyLocale());
             setBodies(emptyLocale());
             setStatus(null);
+            setLiveLog(null);
           }}
         >
           초기화
         </button>
+      </div>
+
+      <h3 style={ui.h3}>전송 로그</h3>
+      <p style={ui.muted}>
+        deviceKey / platform / locale / token 끝 8자리 · 성공·실패 사유
+        {selected
+          ? ` · 캠페인 ${shortId(selected.id)} (${selected.success_count}/${selected.failure_count})`
+          : ""}
+      </p>
+      <div style={styles.logWrap}>
+        {logEntries.length === 0 ? (
+          <pre style={styles.logEmpty}>
+            {loadingList
+              ? "불러오는 중…"
+              : "아직 전송 로그가 없습니다. 보내기 후 여기에 표시됩니다."}
+          </pre>
+        ) : (
+          <div style={styles.logScroll}>
+            <table style={styles.logTable}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>결과</th>
+                  <th style={styles.th}>deviceKey</th>
+                  <th style={styles.th}>platform</th>
+                  <th style={styles.th}>locale</th>
+                  <th style={styles.th}>token</th>
+                  <th style={styles.th}>오류</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logEntries.map((row, idx) => (
+                  <tr key={`${row.deviceKey}-${row.tokenTail}-${idx}`}>
+                    <td
+                      style={{
+                        ...styles.td,
+                        color: row.ok ? "#6ee7a8" : "#ff8a8a",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {row.ok ? "성공" : "실패"}
+                    </td>
+                    <td style={{ ...styles.td, fontFamily: "monospace" }}>
+                      {shortId(row.deviceKey)}
+                    </td>
+                    <td style={styles.td}>{row.platform}</td>
+                    <td style={styles.td}>{row.locale}</td>
+                    <td style={{ ...styles.td, fontFamily: "monospace" }}>
+                      …{row.tokenTail || "—"}
+                    </td>
+                    <td style={{ ...styles.td, color: "#ff8a8a" }}>
+                      {row.error || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <h3 style={ui.h3}>최근 캠페인</h3>
@@ -245,28 +347,52 @@ export default function PushTab() {
                 <th style={styles.th}>제목(KO)</th>
                 <th style={styles.th}>전송</th>
                 <th style={styles.th}>성공/실패</th>
+                <th style={styles.th}>로그</th>
               </tr>
             </thead>
             <tbody>
-              {campaigns.map((c) => (
-                <tr key={c.id}>
-                  <td style={styles.td}>{c.status}</td>
-                  <td style={styles.td}>
-                    {c.titles.ko || c.titles.en || "—"}
-                    {c.error_message ? (
-                      <div style={styles.err}>{c.error_message}</div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    {c.sent_at
-                      ? toLocalInputValue(c.sent_at)
-                      : "—"}
-                  </td>
-                  <td style={styles.td}>
-                    {c.success_count}/{c.failure_count}
-                  </td>
-                </tr>
-              ))}
+              {campaigns.map((c) => {
+                const active = selected?.id === c.id;
+                return (
+                  <tr
+                    key={c.id}
+                    style={active ? styles.rowActive : undefined}
+                    onClick={() => {
+                      setSelectedId(c.id);
+                      setLiveLog(null);
+                    }}
+                  >
+                    <td style={styles.td}>{c.status}</td>
+                    <td style={styles.td}>
+                      {c.titles.ko || c.titles.en || "—"}
+                      {c.error_message ? (
+                        <div style={styles.err}>{c.error_message}</div>
+                      ) : null}
+                    </td>
+                    <td style={styles.td}>
+                      {c.sent_at ? toLocalInputValue(c.sent_at) : "—"}
+                    </td>
+                    <td style={styles.td}>
+                      {c.success_count}/{c.failure_count}
+                    </td>
+                    <td style={styles.td}>
+                      <button
+                        type="button"
+                        style={styles.logBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(c.id);
+                          setLiveLog(null);
+                        }}
+                      >
+                        {(c.delivery_log?.length ?? 0) > 0
+                          ? `${c.delivery_log.length}건 보기`
+                          : "없음"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -317,4 +443,39 @@ const styles: Record<string, CSSProperties> = {
     verticalAlign: "top",
   },
   err: { color: "#ff8a8a", fontSize: 11, marginTop: 4 },
+  logWrap: {
+    border: "1px solid #2a3142",
+    borderRadius: 12,
+    background: "#0b0d12",
+    marginBottom: 20,
+  },
+  logScroll: {
+    maxHeight: 320,
+    overflow: "auto",
+  },
+  logTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: 12,
+  },
+  logEmpty: {
+    margin: 0,
+    padding: 16,
+    color: "#8b93a7",
+    fontSize: 12,
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+    whiteSpace: "pre-wrap",
+  },
+  logBtn: {
+    background: "transparent",
+    border: "1px solid #2a3142",
+    color: "#f4f6fb",
+    borderRadius: 8,
+    padding: "4px 8px",
+    cursor: "pointer",
+    fontSize: 12,
+  },
+  rowActive: {
+    background: "#1a2030",
+  },
 };

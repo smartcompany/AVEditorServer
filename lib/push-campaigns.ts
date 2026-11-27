@@ -6,6 +6,16 @@ export type LocaleMap = Record<PushLocale, string>;
 
 export const PUSH_LOCALES: PushLocale[] = ["en", "ko", "ja", "zh"];
 
+export type PushDeliveryLogEntry = {
+  deviceKey: string;
+  platform: string;
+  locale: string;
+  /** Last 8 chars of FCM token for identification without full secret. */
+  tokenTail: string;
+  ok: boolean;
+  error: string | null;
+};
+
 export type PushCampaignRow = {
   id: string;
   target: string;
@@ -16,6 +26,7 @@ export type PushCampaignRow = {
   sent_at: string | null;
   success_count: number;
   failure_count: number;
+  delivery_log: PushDeliveryLogEntry[];
   error_message: string | null;
   created_at: string;
   updated_at: string;
@@ -32,6 +43,29 @@ function asLocaleMap(raw: unknown): LocaleMap {
   return out;
 }
 
+function tokenTail(token: string): string {
+  if (token.length <= 8) return token;
+  return token.slice(-8);
+}
+
+function asDeliveryLog(raw: unknown): PushDeliveryLogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PushDeliveryLogEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    out.push({
+      deviceKey: typeof row.deviceKey === "string" ? row.deviceKey : "",
+      platform: typeof row.platform === "string" ? row.platform : "unknown",
+      locale: typeof row.locale === "string" ? row.locale : "en",
+      tokenTail: typeof row.tokenTail === "string" ? row.tokenTail : "",
+      ok: Boolean(row.ok),
+      error: typeof row.error === "string" ? row.error : null,
+    });
+  }
+  return out;
+}
+
 export function normalizeCampaign(row: Record<string, unknown>): PushCampaignRow {
   return {
     id: String(row.id),
@@ -43,6 +77,7 @@ export function normalizeCampaign(row: Record<string, unknown>): PushCampaignRow
     sent_at: (row.sent_at as string | null) ?? null,
     success_count: Number(row.success_count ?? 0),
     failure_count: Number(row.failure_count ?? 0),
+    delivery_log: asDeliveryLog(row.delivery_log),
     error_message: (row.error_message as string | null) ?? null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
@@ -51,10 +86,18 @@ export function normalizeCampaign(row: Record<string, unknown>): PushCampaignRow
 
 const BATCH = 500;
 
+type TokenRow = {
+  token: string;
+  deviceKey: string;
+  platform: string;
+  locale: PushLocale;
+};
+
 /** Send a campaign to catalog opt-in tokens, localized per device locale. */
 export async function dispatchCampaign(campaignId: string): Promise<{
   success: number;
   failure: number;
+  deliveryLog: PushDeliveryLogEntry[];
 }> {
   const db = getSupabaseAdmin();
   const { data: raw, error } = await db
@@ -70,6 +113,7 @@ export async function dispatchCampaign(campaignId: string): Promise<{
     return {
       success: campaign.success_count,
       failure: campaign.failure_count,
+      deliveryLog: campaign.delivery_log,
     };
   }
 
@@ -80,12 +124,12 @@ export async function dispatchCampaign(campaignId: string): Promise<{
 
   const { data: tokens, error: tokenErr } = await db
     .from("aveditor_push_tokens")
-    .select("token, locale")
+    .select("token, device_key, platform, locale")
     .eq("master_enabled", true)
     .eq("catalog_enabled", true);
   if (tokenErr) throw tokenErr;
 
-  const byLocale = new Map<PushLocale, string[]>();
+  const byLocale = new Map<PushLocale, TokenRow[]>();
   for (const loc of PUSH_LOCALES) byLocale.set(loc, []);
   for (const row of tokens ?? []) {
     const token = typeof row.token === "string" ? row.token.trim() : "";
@@ -93,13 +137,25 @@ export async function dispatchCampaign(campaignId: string): Promise<{
     const loc = PUSH_LOCALES.includes(row.locale as PushLocale)
       ? (row.locale as PushLocale)
       : "en";
-    byLocale.get(loc)!.push(token);
+    byLocale.get(loc)!.push({
+      token,
+      deviceKey:
+        typeof row.device_key === "string" && row.device_key.trim()
+          ? row.device_key.trim()
+          : "(unknown)",
+      platform:
+        typeof row.platform === "string" && row.platform.trim()
+          ? row.platform.trim()
+          : "unknown",
+      locale: loc,
+    });
   }
 
   const { messaging } = getFirebaseAdmin();
   let success = 0;
   let failure = 0;
   const invalidTokens: string[] = [];
+  const deliveryLog: PushDeliveryLogEntry[] = [];
 
   for (const loc of PUSH_LOCALES) {
     const list = byLocale.get(loc) ?? [];
@@ -117,7 +173,7 @@ export async function dispatchCampaign(campaignId: string): Promise<{
     for (let i = 0; i < list.length; i += BATCH) {
       const chunk = list.slice(i, i + BATCH);
       const res = await messaging.sendEachForMulticast({
-        tokens: chunk,
+        tokens: chunk.map((t) => t.token),
         notification: {
           title: title || "EasyClip",
           body: body || undefined,
@@ -143,13 +199,33 @@ export async function dispatchCampaign(campaignId: string): Promise<{
       success += res.successCount;
       failure += res.failureCount;
       res.responses.forEach((r, idx) => {
-        if (r.success) return;
+        const target = chunk[idx]!;
+        if (r.success) {
+          deliveryLog.push({
+            deviceKey: target.deviceKey,
+            platform: target.platform,
+            locale: target.locale,
+            tokenTail: tokenTail(target.token),
+            ok: true,
+            error: null,
+          });
+          return;
+        }
         const code = r.error?.code ?? "";
+        const message = r.error?.message ?? (code || "send_failed");
+        deliveryLog.push({
+          deviceKey: target.deviceKey,
+          platform: target.platform,
+          locale: target.locale,
+          tokenTail: tokenTail(target.token),
+          ok: false,
+          error: message,
+        });
         if (
           code.includes("registration-token-not-registered") ||
           code.includes("invalid-registration-token")
         ) {
-          invalidTokens.push(chunk[idx]!);
+          invalidTokens.push(target.token);
         }
       });
     }
@@ -166,10 +242,11 @@ export async function dispatchCampaign(campaignId: string): Promise<{
       sent_at: new Date().toISOString(),
       success_count: success,
       failure_count: failure,
+      delivery_log: deliveryLog,
       error_message: null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", campaignId);
 
-  return { success, failure };
+  return { success, failure, deliveryLog };
 }

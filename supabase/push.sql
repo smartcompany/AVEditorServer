@@ -40,10 +40,15 @@ create table if not exists public.aveditor_push_campaigns (
   sent_at      timestamptz,
   success_count integer not null default 0,
   failure_count integer not null default 0,
+  -- Per-device send results: [{deviceKey, platform, locale, tokenTail, ok, error}]
+  delivery_log jsonb not null default '[]'::jsonb,
   error_message text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+alter table public.aveditor_push_campaigns
+  add column if not exists delivery_log jsonb not null default '[]'::jsonb;
 
 alter table public.aveditor_push_tokens enable row level security;
 alter table public.aveditor_push_campaigns enable row level security;
