@@ -48,7 +48,7 @@ export type PlansConfig = {
   plans: PlanConfigItem[];
 };
 
-export const PLANS_CONFIG_VERSION = 0;
+export const PLANS_CONFIG_VERSION = 1;
 
 function L(
   en: string,
@@ -123,10 +123,10 @@ export function defaultPlansConfig(): PlansConfig {
             "导出 Plus 效果 · 不消耗积分",
           ),
           L(
-            "{credits} AI credits every month",
-            "매월 AI 크레딧 {credits}",
-            "毎月 AI クレジット {credits}",
-            "每月 AI 积分 {credits}",
+            "{credits} credits every month",
+            "매월 크레딧 {credits}",
+            "毎月クレジット {credits}",
+            "每月积分 {credits}",
           ),
         ],
         editingUnlocked: true,
@@ -141,10 +141,10 @@ export function defaultPlansConfig(): PlansConfig {
         title: "Pro",
         titles: L("Pro", "Pro", "Pro", "Pro"),
         subtitle: L(
-          "Plus + Pro effects, plus AI tools.",
-          "Plus·Pro 효과와 AI 도구까지.",
-          "Plus・Pro効果とAIツール。",
-          "Plus + Pro 效果，并解锁 AI。",
+          "Plus + Pro effects, with more monthly credits.",
+          "Plus·Pro 효과와 더 많은 월간 크레딧.",
+          "Plus・Pro効果と、より多い毎月クレジット。",
+          "Plus + Pro 效果，更多每月积分。",
         ),
         benefits: [
           L(
@@ -160,20 +160,20 @@ export function defaultPlansConfig(): PlansConfig {
             "导出付费效果 · 不消耗积分",
           ),
           L(
-            "AI tools unlocked",
-            "AI 도구 사용",
-            "AIツールを利用可能",
-            "解锁 AI 工具",
+            "More monthly credits than Plus",
+            "Plus보다 많은 월간 크레딧",
+            "Plusより多い毎月クレジット",
+            "比 Plus 更多的每月积分",
           ),
           L(
-            "{credits} AI credits every month",
-            "매월 AI 크레딧 {credits}",
-            "毎月 AI クレジット {credits}",
-            "每月 AI 积分 {credits}",
+            "{credits} credits every month",
+            "매월 크레딧 {credits}",
+            "毎月クレジット {credits}",
+            "每月积分 {credits}",
           ),
         ],
         editingUnlocked: true,
-        aiEnabled: true,
+        aiEnabled: false,
         monthlyCredits: 1500,
         enabled: false,
         storeProductIdMonthly: "com.smartcompany.aveditor.pro.monthly",
@@ -184,10 +184,10 @@ export function defaultPlansConfig(): PlansConfig {
         title: "Studio",
         titles: L("Studio", "Studio", "Studio", "Studio"),
         subtitle: L(
-          "Everything in Pro, with more AI credits.",
-          "Pro의 모든 기능과 더 많은 AI 크레딧.",
-          "Proのすべてと、より多いAIクレジット。",
-          "包含 Pro 全部功能，更多 AI 积分。",
+          "Everything in Pro, with the highest credit allotment.",
+          "Pro의 모든 기능과 가장 많은 월간 크레딧.",
+          "Proのすべてと、最多の毎月クレジット。",
+          "包含 Pro 全部功能，最高每月积分。",
         ),
         benefits: [
           L(
@@ -203,16 +203,16 @@ export function defaultPlansConfig(): PlansConfig {
             "导出付费效果 · 不消耗积分",
           ),
           L(
-            "AI tools unlocked",
-            "AI 도구 사용",
-            "AIツールを利用可能",
-            "解锁 AI 工具",
+            "More monthly credits than Plus",
+            "Plus보다 많은 월간 크레딧",
+            "Plusより多い毎月クレジット",
+            "比 Plus 更多的每月积分",
           ),
           L(
-            "{credits} AI credits every month",
-            "매월 AI 크레딧 {credits}",
-            "毎月 AI クレジット {credits}",
-            "每月 AI 积分 {credits}",
+            "{credits} credits every month",
+            "매월 크레딧 {credits}",
+            "毎月クレジット {credits}",
+            "每月积分 {credits}",
           ),
           L(
             "Studio creative extras and priority access to new tools",
@@ -222,7 +222,7 @@ export function defaultPlansConfig(): PlansConfig {
           ),
         ],
         editingUnlocked: true,
-        aiEnabled: true,
+        aiEnabled: false,
         monthlyCredits: 4000,
         enabled: false,
         storeProductIdMonthly: "com.smartcompany.aveditor.studio.monthly",
@@ -230,6 +230,19 @@ export function defaultPlansConfig(): PlansConfig {
       },
     ],
   };
+}
+
+/** True if stored plan marketing still advertises non-shipping AI tools. */
+export function planCopyMentionsAiTools(plan: PlanConfigItem): boolean {
+  const chunks = [
+    ...Object.values(plan.subtitle),
+    ...plan.benefits.flatMap((b) => Object.values(b)),
+  ];
+  return chunks.some((t) =>
+    /AI tools|AI 도구|AIツール|AI 工具|AI credits|AI 크레딧|AIクレジット|AI 积分/i.test(
+      t,
+    ),
+  );
 }
 
 export function monthlyCreditsFromConfig(

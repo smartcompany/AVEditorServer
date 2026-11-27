@@ -1,5 +1,6 @@
 import {
   defaultPlansConfig,
+  planCopyMentionsAiTools,
   type LocaleMap,
   type PlanConfigItem,
   type PlanTier,
@@ -69,7 +70,7 @@ export function normalizePlansConfig(raw: PlansConfig): PlansConfig {
     const incoming = byId.get(id);
     const fallback = seed.plans.find((p) => p.id === id)!;
     if (!incoming) return fallback;
-    return {
+    const merged: PlanConfigItem = {
       ...fallback,
       ...incoming,
       id,
@@ -91,6 +92,16 @@ export function normalizePlansConfig(raw: PlansConfig): PlansConfig {
           ? incoming.storeProductIdAnnual.trim()
           : fallback.storeProductIdAnnual,
     };
+    // Drop stale marketing that promised non-shipping AI tools.
+    if (planCopyMentionsAiTools(merged)) {
+      return {
+        ...merged,
+        subtitle: fallback.subtitle,
+        benefits: fallback.benefits,
+        aiEnabled: false,
+      };
+    }
+    return { ...merged, aiEnabled: false };
   });
   return {
     version: Math.max(1, Math.floor(raw.version || 1)),

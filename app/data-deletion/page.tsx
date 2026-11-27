@@ -43,7 +43,17 @@ export default function DataDeletionPage() {
         </ul>
       </Section>
 
-      <Section title="3. Disconnect the app on Facebook">
+      <Section title="3. Delete your app account">
+        <p>
+          If you signed in to {SITE.appName}, open the app → Settings → Delete
+          account. This removes your server profile, credit-account link, and
+          push registration tied to that account. App Store / Google Play
+          subscriptions are not canceled automatically — manage them in your
+          store account settings.
+        </p>
+      </Section>
+
+      <Section title="4. Disconnect the app on Facebook">
         <p>
           You can revoke the app under Facebook settings. Open{" "}
           <a href="https://www.facebook.com/settings?tab=applications" style={link}>
@@ -54,7 +64,7 @@ export default function DataDeletionPage() {
         </p>
       </Section>
 
-      <Section title="4. Deletion requests / contact">
+      <Section title="5. Deletion requests / contact">
         <p>
           For further deletion help, email{" "}
           <a
